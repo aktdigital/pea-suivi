@@ -108,6 +108,25 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
           className="w-48"
         />
       </div>
+
+      {/* Filtre contrôles Michèle */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-muted-foreground">Contrôles</label>
+        <button
+          type="button"
+          onClick={() => {
+            const current = searchParams.get("controle_a_faire");
+            setParam("controle_a_faire", current === "1" ? "" : "1");
+          }}
+          className={`h-9 rounded-md border px-3 py-1 text-sm shadow-sm transition-colors ${
+            searchParams.get("controle_a_faire") === "1"
+              ? "bg-destructive text-destructive-foreground border-destructive"
+              : "border-input bg-background hover:bg-accent"
+          }`}
+        >
+          Mes contrôles à faire
+        </button>
+      </div>
     </div>
   );
 }

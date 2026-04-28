@@ -60,7 +60,23 @@ export interface Operation {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  courrier_pea: StatutControle | null;
+  lettre_mission: StatutControle | null;
+  conformite: StatutControle | null;
+  controle_par_id: string | null;
+  controle_at: string | null;
 }
+
+export type StatutControle = "a_faire" | "so" | "en_attente_avenants" | "en_cours_compagnie" | "valide" | "ok";
+
+export const STATUTS_CONTROLE: { value: StatutControle; label: string }[] = [
+  { value: "a_faire", label: "À faire" },
+  { value: "so", label: "Sans objet" },
+  { value: "en_attente_avenants", label: "En attente avenants" },
+  { value: "en_cours_compagnie", label: "En cours compagnie" },
+  { value: "valide", label: "Validé" },
+  { value: "ok", label: "OK" },
+];
 
 export type StatutBilan = "a_faire" | "planifie" | "realise" | "valide" | "refuse";
 

@@ -10,7 +10,7 @@ import { TrendingUp, Banknote, RefreshCw, AlertCircle } from "lucide-react";
 import type { Client, Conseiller } from "@/lib/types";
 
 interface PageProps {
-  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string }>;
+  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string; controle_a_faire?: string }>;
 }
 
 export default async function OperationsPage({ searchParams }: PageProps) {
@@ -118,11 +118,12 @@ export default async function OperationsPage({ searchParams }: PageProps) {
         {/* Tableau */}
         <Suspense fallback={<div className="text-sm text-muted-foreground">Chargement…</div>}>
           <OperationsTable
-            mois={mois}
+            mois={params.controle_a_faire === "1" ? undefined : mois}
             conseiller={params.conseiller}
             statut={params.statut}
             type={params.type}
             q={params.q}
+            controleAFaire={params.controle_a_faire === "1"}
             clients={(clients ?? []) as Client[]}
             conseillers={(conseillers ?? []) as Conseiller[]}
             typeOps={refOps ?? []}

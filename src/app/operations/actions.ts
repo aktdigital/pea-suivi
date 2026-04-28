@@ -18,6 +18,9 @@ export type OperationFormData = {
   isin: string;
   validation: boolean;
   commentaire: string;
+  courrier_pea?: string;
+  lettre_mission?: string;
+  conformite?: string;
 };
 
 export async function createOperation(formData: OperationFormData) {
@@ -54,8 +57,21 @@ export async function createOperation(formData: OperationFormData) {
 
 export async function updateOperation(id: string, formData: OperationFormData) {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const { error } = await supabase.from("operations").update({
+  // Fetch existing operation to detect contrôle changes
+  const { data: existing } = await supabase
+    .from("operations")
+    .select("courrier_pea, lettre_mission, conformite")
+    .eq("id", id)
+    .single();
+
+  const controleChanged =
+    formData.courrier_pea !== undefined && formData.courrier_pea !== existing?.courrier_pea ||
+    formData.lettre_mission !== undefined && formData.lettre_mission !== existing?.lettre_mission ||
+    formData.conformite !== undefined && formData.conformite !== existing?.conformite;
+
+  const updateData: Record<string, unknown> = {
     date: formData.date,
     client_id: formData.client_id || null,
     type_operation: formData.type_operation || null,
@@ -71,7 +87,18 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     validation: formData.validation ?? false,
     commentaire: formData.commentaire || null,
     updated_at: new Date().toISOString(),
-  }).eq("id", id);
+  };
+
+  if (formData.courrier_pea !== undefined) updateData.courrier_pea = formData.courrier_pea || "a_faire";
+  if (formData.lettre_mission !== undefined) updateData.lettre_mission = formData.lettre_mission || "a_faire";
+  if (formData.conformite !== undefined) updateData.conformite = formData.conformite || "a_faire";
+
+  if (controleChanged && user?.id) {
+    updateData.controle_par_id = user.id;
+    updateData.controle_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase.from("operations").update(updateData).eq("id", id);
 
   if (error) {
     return { error: error.message };

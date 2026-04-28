@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { OperationRowActions } from "./operation-row-actions";
-import type { Client, Conseiller, Operation } from "@/lib/types";
+import type { Client, Conseiller, Operation, StatutControle } from "@/lib/types";
 
 interface OperationsTableProps {
   mois?: string;
@@ -10,6 +10,7 @@ interface OperationsTableProps {
   statut?: string;
   type?: string;
   q?: string;
+  controleAFaire?: boolean;
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -17,6 +18,25 @@ interface OperationsTableProps {
   statuts: { id: number; label: string }[];
   compagnies: { id: number; label: string }[];
   produitsStructures: { isin: string; nom_produit: string }[];
+}
+
+function getControleVariant(statut: StatutControle | null | undefined): "default" | "success" | "warning" | "destructive" | "outline" | "secondary" | "info" {
+  if (!statut || statut === "a_faire") return "destructive";
+  if (statut === "so") return "secondary";
+  if (statut === "ok" || statut === "valide") return "success";
+  if (statut === "en_attente_avenants") return "warning";
+  if (statut === "en_cours_compagnie") return "info";
+  return "outline";
+}
+
+function getControleLabel(statut: StatutControle | null | undefined): string {
+  if (!statut || statut === "a_faire") return "À faire";
+  if (statut === "so") return "S/O";
+  if (statut === "ok") return "OK";
+  if (statut === "valide") return "Validé";
+  if (statut === "en_attente_avenants") return "En attente";
+  if (statut === "en_cours_compagnie") return "En cours";
+  return statut;
 }
 
 function getStatutVariant(statut: string | null): "default" | "success" | "warning" | "destructive" | "outline" {
@@ -34,6 +54,7 @@ export async function OperationsTable({
   statut,
   type,
   q,
+  controleAFaire,
   clients,
   conseillers,
   typeOps,
@@ -48,6 +69,10 @@ export async function OperationsTable({
     .from("operations")
     .select("*, clients(nom, prenom)")
     .order("date", { ascending: false });
+
+  if (controleAFaire) {
+    query = query.or("courrier_pea.eq.a_faire,lettre_mission.eq.a_faire,conformite.eq.a_faire");
+  }
 
   // Filtre période
   if (mois) {
@@ -113,6 +138,9 @@ export async function OperationsTable({
             <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Support</th>
             <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">ISIN</th>
             <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Validé</th>
+            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Courrier PEA</th>
+            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Lettre mission</th>
+            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Conformité</th>
             <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Commentaire</th>
             <th className="px-3 py-2 font-medium text-muted-foreground"></th>
           </tr>
@@ -158,6 +186,21 @@ export async function OperationsTable({
                 ) : (
                   <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs">—</span>
                 )}
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                <Badge variant={getControleVariant(op.courrier_pea as StatutControle)}>
+                  {getControleLabel(op.courrier_pea as StatutControle)}
+                </Badge>
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                <Badge variant={getControleVariant(op.lettre_mission as StatutControle)}>
+                  {getControleLabel(op.lettre_mission as StatutControle)}
+                </Badge>
+              </td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                <Badge variant={getControleVariant(op.conformite as StatutControle)}>
+                  {getControleLabel(op.conformite as StatutControle)}
+                </Badge>
               </td>
               <td className="px-3 py-2 max-w-[150px]">
                 <span className="block truncate text-xs text-muted-foreground" title={op.commentaire ?? ""}>

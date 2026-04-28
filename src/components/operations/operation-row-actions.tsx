@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { deleteOperation } from "@/app/operations/actions";
-import type { Operation, Client, Conseiller } from "@/lib/types";
+import type { Operation, Client, Conseiller, StatutControle } from "@/lib/types";
+import { STATUTS_CONTROLE } from "@/lib/types";
 
 interface RowActionsProps {
   operation: Operation & { clients?: { nom: string; prenom: string | null } | null };
@@ -116,6 +117,9 @@ function EditDialog({
       isin: String(fd.get("isin") || ""),
       validation: fd.get("validation") === "on",
       commentaire: String(fd.get("commentaire") || ""),
+      courrier_pea: String(fd.get("courrier_pea") || "a_faire"),
+      lettre_mission: String(fd.get("lettre_mission") || "a_faire"),
+      conformite: String(fd.get("conformite") || "a_faire"),
     };
     const result = await updateOperation(operation.id, data);
     setSaving(false);
@@ -153,7 +157,7 @@ function EditDialog({
 }
 
 interface FormInnerProps {
-  defaultValues?: Partial<Operation>;
+  defaultValues?: Partial<Operation & { courrier_pea?: StatutControle | null; lettre_mission?: StatutControle | null; conformite?: StatutControle | null }>;
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -370,6 +374,49 @@ function OperationFormInner({
           placeholder="Commentaire…"
           className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
+      </div>
+
+      {/* Section contrôles administratifs Michèle */}
+      <div className="border-t pt-4 space-y-3">
+        <h3 className="text-sm font-semibold text-muted-foreground">Contrôles administratifs (Michèle)</h3>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Courrier PEA</label>
+            <select
+              name="courrier_pea"
+              defaultValue={defaultValues?.courrier_pea ?? "a_faire"}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {STATUTS_CONTROLE.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Lettre mission</label>
+            <select
+              name="lettre_mission"
+              defaultValue={defaultValues?.lettre_mission ?? "a_faire"}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {STATUTS_CONTROLE.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Conformité</label>
+            <select
+              name="conformite"
+              defaultValue={defaultValues?.conformite ?? "a_faire"}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              {STATUTS_CONTROLE.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
