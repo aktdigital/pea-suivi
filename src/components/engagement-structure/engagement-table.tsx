@@ -1,204 +1,257 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import type { ProduitStructure } from "@/lib/types";
 
-interface ProduitStructure {
-  isin: string;
-  nom_produit: string;
-  sous_jacent: string | null;
-  mecanisme: string | null;
-  duree: string | null;
-  frequence_rappel: string | null;
-  protection_gain: number | null;
-  protection_capital: number | null;
-  degressivite: boolean | null;
-  objectif_rendement: number | null;
-  eligible_contrats: string | null;
-  upfront_brut: string | null;
-  date_fin_commercialisation: string | null;
-  enveloppe_reservee: number | null;
-  montant_fait: number | null;
-  restant_a_faire: number | null;
-  compagnies_cibles: string | null;
-  commentaire: string | null;
-  active: boolean;
+const MOIS_ORDER = [
+  "janvier", "février", "mars", "avril", "mai", "juin",
+  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+];
+
+function capitalize(s: string | null): string {
+  if (!s) return "—";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function formatUpfront(val: string | null): string {
+  if (!val) return "—";
+  const num = parseFloat(val);
+  if (!isNaN(num) && val.trim().match(/^[\d.]+$/)) {
+    return `${(num * 100).toFixed(2)} %`;
+  }
+  return val;
 }
 
 interface Props {
-  produitsEnCours: ProduitStructure[];
-  produitsExpires: ProduitStructure[];
-}
-
-function joursRestants(dateStr: string | null): number | null {
-  if (!dateStr) return null;
-  const fin = new Date(dateStr);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  fin.setHours(0, 0, 0, 0);
-  return Math.floor((fin.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function DetailModal({ produit, onClose }: { produit: ProduitStructure; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-background rounded-xl border shadow-lg w-full max-w-xl max-h-[90vh] overflow-y-auto p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold leading-tight">{produit.nom_produit}</h2>
-          <button onClick={onClose} className="rounded-sm opacity-70 hover:opacity-100 text-lg">✕</button>
-        </div>
-
-        <div className="space-y-4 text-sm">
-          <div className="grid grid-cols-2 gap-3">
-            <DetailRow label="ISIN" value={produit.isin} />
-            <DetailRow label="Mécanisme" value={produit.mecanisme} />
-            <DetailRow label="Durée" value={produit.duree} />
-            <DetailRow label="Fréquence rappel" value={produit.frequence_rappel} />
-          </div>
-
-          <div className="border-t pt-3 space-y-2">
-            <h3 className="font-medium">Sous-jacent &amp; Rendement</h3>
-            <DetailRow label="Sous-jacent" value={produit.sous_jacent} />
-            <DetailRow label="Objectif rendement" value={produit.objectif_rendement != null ? `${produit.objectif_rendement} %` : null} />
-            <DetailRow label="Protection gain" value={produit.protection_gain != null ? `${produit.protection_gain} %` : null} />
-            <DetailRow label="Protection capital" value={produit.protection_capital != null ? `${produit.protection_capital} %` : null} />
-            <DetailRow label="Dégressivité" value={produit.degressivite === null ? null : produit.degressivite ? "Oui" : "Non"} />
-            <DetailRow label="Upfront brut" value={produit.upfront_brut} />
-          </div>
-
-          <div className="border-t pt-3 space-y-2">
-            <h3 className="font-medium">Commercialisation</h3>
-            <DetailRow label="Fin commercialisation" value={formatDate(produit.date_fin_commercialisation)} />
-            <DetailRow label="Enveloppe réservée" value={formatCurrency(produit.enveloppe_reservee)} />
-            <DetailRow label="Montant fait" value={formatCurrency(produit.montant_fait)} />
-            <DetailRow label="Restant à faire" value={formatCurrency(produit.restant_a_faire)} />
-            <DetailRow label="Contrats éligibles" value={produit.eligible_contrats} />
-            <DetailRow label="Compagnies cibles" value={produit.compagnies_cibles} />
-          </div>
-
-          {produit.commentaire && (
-            <div className="border-t pt-3">
-              <h3 className="font-medium mb-1">Commentaire</h3>
-              <p className="text-muted-foreground leading-relaxed">{produit.commentaire}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div className="flex gap-2">
-      <span className="text-muted-foreground min-w-[140px] shrink-0">{label} :</span>
-      <span className="font-medium">{value ?? "—"}</span>
-    </div>
-  );
+  produits: ProduitStructure[];
 }
 
 function ProduitRow({ produit, index }: { produit: ProduitStructure; index: number }) {
-  const [open, setOpen] = useState(false);
-  const jours = joursRestants(produit.date_fin_commercialisation);
-  const isUrgent = jours !== null && jours <= 7;
   const isDepasse = (produit.restant_a_faire ?? 1) <= 0;
-  const pct = produit.enveloppe_reservee && produit.enveloppe_reservee > 0
-    ? Math.min(100, ((produit.montant_fait ?? 0) / produit.enveloppe_reservee) * 100)
-    : 0;
 
-  const rowClass = isDepasse || isUrgent
-    ? "border-b cursor-pointer bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50"
-    : `border-b cursor-pointer hover:bg-muted/30 ${index % 2 === 0 ? "" : "bg-muted/10"}`;
+  const rowClass = isDepasse
+    ? "border-b bg-red-50 dark:bg-red-950/30"
+    : `border-b ${index % 2 === 0 ? "" : "bg-muted/10"}`;
 
   return (
-    <>
-      <tr className={rowClass} onClick={() => setOpen(true)}>
-        <td className="px-3 py-2">
-          <div className="font-medium text-sm leading-tight">{produit.nom_produit}</div>
-          {produit.sous_jacent && <div className="text-xs text-muted-foreground">{produit.sous_jacent}</div>}
-        </td>
-        <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground font-mono">{produit.isin}</td>
-        <td className="px-3 py-2 whitespace-nowrap">
-          {produit.mecanisme ? <Badge variant="info">{produit.mecanisme}</Badge> : "—"}
-        </td>
-        <td className="px-3 py-2 whitespace-nowrap text-right">{formatCurrency(produit.enveloppe_reservee)}</td>
-        <td className="px-3 py-2 whitespace-nowrap text-right">{formatCurrency(produit.montant_fait)}</td>
-        <td className="px-3 py-2 whitespace-nowrap text-right">
-          <span className={(produit.restant_a_faire ?? 1) <= 0 ? "text-destructive font-semibold" : "text-green-700 font-semibold"}>
-            {formatCurrency(produit.restant_a_faire)}
-          </span>
-        </td>
-        <td className="px-3 py-2 min-w-[120px]">
-          <div className="flex items-center gap-2">
-            <Progress value={produit.montant_fait ?? 0} max={produit.enveloppe_reservee ?? 100} className="flex-1 h-2" />
-            <span className="text-xs whitespace-nowrap">{pct.toFixed(0)} %</span>
-          </div>
-        </td>
-        <td className="px-3 py-2 whitespace-nowrap">
-          {produit.date_fin_commercialisation ? (
-            <Badge variant={isUrgent ? "destructive" : isDepasse ? "destructive" : "warning"}>
-              {formatDate(produit.date_fin_commercialisation)}
-              {jours !== null && jours >= 0 && <span className="ml-1">({jours}j)</span>}
-            </Badge>
-          ) : "—"}
-        </td>
-        <td className="px-3 py-2 text-xs text-muted-foreground max-w-[140px]">
-          <span className="block truncate" title={produit.eligible_contrats ?? ""}>{produit.eligible_contrats ?? "—"}</span>
-        </td>
-        <td className="px-3 py-2 text-xs text-muted-foreground max-w-[120px]">
-          <span className="block truncate" title={produit.compagnies_cibles ?? ""}>{produit.compagnies_cibles ?? "—"}</span>
-        </td>
-        <td className="px-3 py-2">
-          <button
-            className="text-xs text-muted-foreground hover:text-foreground underline"
-            onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-          >
-            Détail
-          </button>
-        </td>
-      </tr>
-      {open && <DetailModal produit={produit} onClose={() => setOpen(false)} />}
-    </>
+    <tr className={rowClass}>
+      <td className="px-3 py-2">
+        <div className="font-medium text-sm leading-tight">{produit.nom_produit}</div>
+      </td>
+      <td className="px-3 py-2 text-xs text-muted-foreground max-w-[140px]">
+        <span className="block truncate" title={produit.compagnies_cibles ?? ""}>{produit.compagnies_cibles ?? "—"}</span>
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs">{produit.structureur ?? "—"}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs font-mono text-muted-foreground">{produit.isin}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{produit.sous_jacent ?? "—"}</td>
+      <td className="px-3 py-2 whitespace-nowrap">
+        {produit.mecanisme ? <Badge variant="info">{produit.mecanisme}</Badge> : "—"}
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs text-right">{formatUpfront(produit.upfront_brut)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.enveloppe_reservee)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.montant_fait)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.total_new_cash)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.total_encours)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-right text-xs font-medium">{formatCurrency(produit.ca_up_front)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs">{capitalize(produit.mois_creation)}</td>
+    </tr>
   );
 }
 
-export function EngagementTable({ produitsEnCours, produitsExpires }: Props) {
-  const [expiresOpen, setExpiresOpen] = useState(false);
+interface RecapMois {
+  mois: string;
+  enveloppe: number;
+  realise: number;
+  caUpFront: number;
+  newCash: number;
+  encours: number;
+  nb: number;
+}
+
+function RecapMensuel({ produits }: { produits: ProduitStructure[] }) {
+  const recap = useMemo(() => {
+    const map = new Map<string, RecapMois>();
+    for (const p of produits) {
+      if (!p.mois_creation) continue;
+      const key = p.mois_creation.toLowerCase();
+      const existing = map.get(key) ?? {
+        mois: key,
+        enveloppe: 0,
+        realise: 0,
+        caUpFront: 0,
+        newCash: 0,
+        encours: 0,
+        nb: 0,
+      };
+      existing.enveloppe += p.enveloppe_reservee ?? 0;
+      existing.realise += p.montant_fait ?? 0;
+      existing.caUpFront += p.ca_up_front ?? 0;
+      existing.newCash += p.total_new_cash ?? 0;
+      existing.encours += p.total_encours ?? 0;
+      existing.nb += 1;
+      map.set(key, existing);
+    }
+
+    return MOIS_ORDER
+      .filter((m) => map.has(m))
+      .map((m) => map.get(m)!);
+  }, [produits]);
+
+  const totaux = useMemo(() => ({
+    enveloppe: recap.reduce((s, r) => s + r.enveloppe, 0),
+    realise: recap.reduce((s, r) => s + r.realise, 0),
+    caUpFront: recap.reduce((s, r) => s + r.caUpFront, 0),
+    newCash: recap.reduce((s, r) => s + r.newCash, 0),
+    encours: recap.reduce((s, r) => s + r.encours, 0),
+    nb: recap.reduce((s, r) => s + r.nb, 0),
+  }), [recap]);
+
+  if (recap.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border overflow-x-auto">
+      <div className="px-4 py-3 border-b bg-muted/30">
+        <h3 className="text-sm font-semibold">Récap mensuel</h3>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Mois</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Engagements pris</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Enveloppe réalisée</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">CA Up Front</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">New Cash</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Encours</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Nb produits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recap.map((r, i) => (
+            <tr key={r.mois} className={`border-b ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
+              <td className="px-3 py-2 font-medium">{capitalize(r.mois)}</td>
+              <td className="px-3 py-2 text-right">{formatCurrency(r.enveloppe)}</td>
+              <td className="px-3 py-2 text-right">{formatCurrency(r.realise)}</td>
+              <td className="px-3 py-2 text-right">{formatCurrency(r.caUpFront)}</td>
+              <td className="px-3 py-2 text-right">{formatCurrency(r.newCash)}</td>
+              <td className="px-3 py-2 text-right">{formatCurrency(r.encours)}</td>
+              <td className="px-3 py-2 text-right">{r.nb}</td>
+            </tr>
+          ))}
+          {/* Ligne TOTAL */}
+          <tr className="border-b font-semibold bg-muted/20">
+            <td className="px-3 py-2">TOTAL</td>
+            <td className="px-3 py-2 text-right">{formatCurrency(totaux.enveloppe)}</td>
+            <td className="px-3 py-2 text-right">{formatCurrency(totaux.realise)}</td>
+            <td className="px-3 py-2 text-right">{formatCurrency(totaux.caUpFront)}</td>
+            <td className="px-3 py-2 text-right">{formatCurrency(totaux.newCash)}</td>
+            <td className="px-3 py-2 text-right">{formatCurrency(totaux.encours)}</td>
+            <td className="px-3 py-2 text-right">{totaux.nb}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function EngagementTable({ produits }: Props) {
+  const [filterMois, setFilterMois] = useState<string>("tous");
+  const [filterStructureur, setFilterStructureur] = useState<string>("tous");
+
+  // Listes distinctes pour les filtres
+  const moisDisponibles = useMemo(() => {
+    const set = new Set<string>();
+    produits.forEach((p) => { if (p.mois_creation) set.add(p.mois_creation.toLowerCase()); });
+    return MOIS_ORDER.filter((m) => set.has(m));
+  }, [produits]);
+
+  const structureursDisponibles = useMemo(() => {
+    const set = new Set<string>();
+    produits.forEach((p) => { if (p.structureur) set.add(p.structureur); });
+    return Array.from(set).sort();
+  }, [produits]);
+
+  // Tri par défaut : mois_creation (MOIS_ORDER index) puis enveloppe_reservee desc
+  const sorted = useMemo(() => {
+    return [...produits].sort((a, b) => {
+      const mA = a.mois_creation ? MOIS_ORDER.indexOf(a.mois_creation.toLowerCase()) : 99;
+      const mB = b.mois_creation ? MOIS_ORDER.indexOf(b.mois_creation.toLowerCase()) : 99;
+      if (mA !== mB) return mA - mB;
+      return (b.enveloppe_reservee ?? 0) - (a.enveloppe_reservee ?? 0);
+    });
+  }, [produits]);
+
+  const filtered = useMemo(() => {
+    return sorted.filter((p) => {
+      const okMois = filterMois === "tous" || (p.mois_creation?.toLowerCase() === filterMois);
+      const okStructureur = filterStructureur === "tous" || p.structureur === filterStructureur;
+      return okMois && okStructureur;
+    });
+  }, [sorted, filterMois, filterStructureur]);
 
   return (
     <div className="space-y-6">
-      {/* Tableau produits en cours */}
+      {/* Filtres */}
+      <div className="flex flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Mois :</label>
+          <select
+            value={filterMois}
+            onChange={(e) => setFilterMois(e.target.value)}
+            className="text-xs border rounded px-2 py-1 bg-background"
+          >
+            <option value="tous">Tous mois</option>
+            {moisDisponibles.map((m) => (
+              <option key={m} value={m}>{capitalize(m)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Structureur :</label>
+          <select
+            value={filterStructureur}
+            onChange={(e) => setFilterStructureur(e.target.value)}
+            className="text-xs border rounded px-2 py-1 bg-background"
+          >
+            <option value="tous">Tous structureurs</option>
+            {structureursDisponibles.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        <span className="text-xs text-muted-foreground self-center">{filtered.length} produit(s)</span>
+      </div>
+
+      {/* Tableau principal */}
       <div className="rounded-lg border overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
-              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Nom produit</th>
-              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">ISIN</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Nom du produit structuré</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Compagnie(s) éligible(s)</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Structureur</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Code ISIN</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Sous-jacent</th>
               <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Mécanisme</th>
-              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Enveloppe</th>
-              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Montant fait</th>
-              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Restant</th>
-              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">% Réalisé</th>
-              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Date fin</th>
-              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Contrats éligibles</th>
-              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Compagnies</th>
-              <th className="px-3 py-2"></th>
+              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">UP FRONT</th>
+              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Enveloppe totale réservée</th>
+              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Enveloppe réalisée</th>
+              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Total New Cash</th>
+              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Total Encours</th>
+              <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">CA UP FRONT</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Mois de création</th>
             </tr>
           </thead>
           <tbody>
-            {produitsEnCours.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground text-sm">
-                  Aucun produit en cours de commercialisation.
+                <td colSpan={13} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                  Aucun produit pour ces filtres.
                 </td>
               </tr>
             ) : (
-              produitsEnCours.map((p, i) => (
+              filtered.map((p, i) => (
                 <ProduitRow key={p.isin} produit={p} index={i} />
               ))
             )}
@@ -206,45 +259,8 @@ export function EngagementTable({ produitsEnCours, produitsExpires }: Props) {
         </table>
       </div>
 
-      {/* Section produits expirés (collapsable) */}
-      <div className="border rounded-lg">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/30 transition-colors"
-          onClick={() => setExpiresOpen((v) => !v)}
-        >
-          <span className="text-muted-foreground">
-            Produits expirés ({produitsExpires.length})
-          </span>
-          <span className="text-muted-foreground">{expiresOpen ? "▲" : "▼"}</span>
-        </button>
-        {expiresOpen && (
-          <div className="border-t overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Nom produit</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">ISIN</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Mécanisme</th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Enveloppe</th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Montant fait</th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Restant</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">% Réalisé</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Date fin</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Contrats éligibles</th>
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Compagnies</th>
-                  <th className="px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {produitsExpires.map((p, i) => (
-                  <ProduitRow key={p.isin} produit={p} index={i} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Récap mensuel */}
+      <RecapMensuel produits={produits} />
     </div>
   );
 }

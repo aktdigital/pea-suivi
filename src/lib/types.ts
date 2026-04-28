@@ -99,3 +99,31 @@ export interface RefRow {
   ordre: number;
   active: boolean;
 }
+
+export interface ProduitStructure {
+  isin: string;
+  nom_produit: string;
+  sous_jacent: string | null;
+  mecanisme: string | null;
+  duree: string | null;
+  frequence_rappel: string | null;
+  protection_gain: number | null;
+  protection_capital: number | null;
+  degressivite: boolean | null;
+  objectif_rendement: number | null;
+  eligible_contrats: string | null;
+  upfront_brut: string | null;
+  date_fin_commercialisation: string | null;
+  enveloppe_reservee: number | null;
+  montant_fait: number | null;
+  restant_a_faire: number | null;
+  compagnies_cibles: string | null;
+  commentaire: string | null;
+  active: boolean;
+  // Nouveaux champs
+  structureur: string | null;
+  total_new_cash: number | null;
+  total_encours: number | null;
+  ca_up_front: number | null;
+  mois_creation: string | null;
+}
