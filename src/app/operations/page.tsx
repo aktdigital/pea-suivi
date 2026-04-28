@@ -17,10 +17,12 @@ export default async function OperationsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const supabase = await createClient();
 
-  // Mois courant par défaut
+  // Mois courant par défaut — "" ou "all" = tous les mois (pas de filtre date)
   const now = new Date();
   const defaultMois = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const mois = params.mois ?? defaultMois;
+  const moisRaw = params.mois;
+  const mois = (!moisRaw || moisRaw === "all") ? undefined : moisRaw;
+  const moisForKpi = mois ?? defaultMois;
 
   // Chargement des référentiels en parallèle
   const [
@@ -41,8 +43,8 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
   ]);
 
-  // KPIs pour le mois courant (mois courant filtré)
-  const [year, month] = mois.split("-");
+  // KPIs toujours sur le mois affiché (mois sélectionné ou mois courant par défaut)
+  const [year, month] = moisForKpi.split("-");
   const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
 
   let kpiQuery = supabase
@@ -76,9 +78,9 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     <AppShell>
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Opérations</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+          <div className="pb-4 border-b border-pea-gray/30 flex-1">
+            <h1 className="text-3xl font-serif font-semibold tracking-tight text-pea-blue">Opérations</h1>
+            <p className="text-sm text-pea-gray mt-1">
               Suivi des souscriptions, rachats, arbitrages et autres opérations.
             </p>
           </div>
@@ -96,13 +98,13 @@ export default async function OperationsPage({ searchParams }: PageProps) {
         {/* KPI cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => (
-            <Card key={k.label}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{k.label}</CardTitle>
-                <k.icon className="size-4 text-muted-foreground" />
+            <Card key={k.label} className="border-pea-gray/30 bg-white">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6 pt-6">
+                <CardTitle className="text-xs font-medium text-pea-gray uppercase tracking-wide">{k.label}</CardTitle>
+                <k.icon className="size-4 text-pea-teal" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-semibold">{k.value}</div>
+              <CardContent className="px-6 pb-6">
+                <div className="text-3xl font-serif font-semibold text-pea-blue">{k.value}</div>
               </CardContent>
             </Card>
           ))}

@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import AppShell from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
@@ -204,9 +203,9 @@ export default async function DashboardPage() {
   return (
     <AppShell>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tableau de bord</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="pb-4 border-b border-pea-gray/30">
+          <h1 className="text-3xl font-serif font-semibold tracking-tight text-pea-blue">Tableau de bord</h1>
+          <p className="text-sm text-pea-gray mt-1">
             Vue d&apos;ensemble de l&apos;activité — {MOIS[month - 1]} {year}
           </p>
         </div>
@@ -214,13 +213,13 @@ export default async function DashboardPage() {
         {/* KPI cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => (
-            <Card key={k.label}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{k.label}</CardTitle>
-                <k.icon className="size-4 text-muted-foreground" />
+            <Card key={k.label} className="border-pea-gray/30 bg-white">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6 pt-6">
+                <CardTitle className="text-xs font-medium text-pea-gray uppercase tracking-wide">{k.label}</CardTitle>
+                <k.icon className="size-4 text-pea-teal" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-semibold">{k.value}</div>
+              <CardContent className="px-6 pb-6">
+                <div className="text-3xl font-serif font-semibold text-pea-blue">{k.value}</div>
               </CardContent>
             </Card>
           ))}
@@ -234,47 +233,59 @@ export default async function DashboardPage() {
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-2 font-medium text-muted-foreground whitespace-nowrap">Opération</th>
+                <tr className="border-b bg-pea-blue/5">
+                  <th className="text-left px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Opération</th>
                   {T1_MOIS.map((m) => (
-                    <Fragment key={m}>
-                      <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{MOIS[m - 1]} C</th>
-                      <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{MOIS[m - 1]} M</th>
-                    </Fragment>
+                    <th key={m} className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">{MOIS[m - 1]}</th>
                   ))}
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Total C</th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Total M</th>
+                  <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Total T1</th>
                 </tr>
               </thead>
               <tbody>
                 {bilanTotaux.map((row, i) => (
-                  <tr key={row.label} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
-                    <td className="px-4 py-2 whitespace-nowrap">{row.label}</td>
-                    {T1_MOIS.map((m) => (
-                      <Fragment key={m}>
-                        <td className="px-3 py-2 text-right">{row.data[`${m}_C`] ?? 0}</td>
-                        <td className="px-3 py-2 text-right">{row.data[`${m}_M`] ?? 0}</td>
-                      </Fragment>
-                    ))}
-                    <td className="px-3 py-2 text-right font-semibold">{row.totalC}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{row.totalM}</td>
+                  <tr key={row.label} className={`border-b last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}>
+                    <td className="px-4 py-2 whitespace-nowrap text-pea-graphite">{row.label}</td>
+                    {T1_MOIS.map((m) => {
+                      const c = row.data[`${m}_C`] ?? 0;
+                      const mv = row.data[`${m}_M`] ?? 0;
+                      return (
+                        <td key={m} className="px-4 py-2 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {c}</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {mv}</span>
+                          </span>
+                        </td>
+                      );
+                    })}
+                    <td className="px-4 py-2 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {row.totalC}</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {row.totalM}</span>
+                      </span>
+                    </td>
                   </tr>
                 ))}
                 {/* Ligne total */}
-                <tr className="border-t font-bold bg-muted/20">
-                  <td className="px-4 py-2 whitespace-nowrap">TOTAL</td>
+                <tr className="border-t font-bold bg-pea-blue/5">
+                  <td className="px-4 py-2 whitespace-nowrap text-pea-blue uppercase text-xs tracking-wide">TOTAL</td>
                   {T1_MOIS.map((m) => {
                     const totC = bilanTotaux.reduce((acc, r) => acc + (r.data[`${m}_C`] ?? 0), 0);
                     const totM = bilanTotaux.reduce((acc, r) => acc + (r.data[`${m}_M`] ?? 0), 0);
                     return (
-                      <Fragment key={m}>
-                        <td className="px-3 py-2 text-right">{totC}</td>
-                        <td className="px-3 py-2 text-right">{totM}</td>
-                      </Fragment>
+                      <td key={m} className="px-4 py-2 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {totC}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {totM}</span>
+                        </span>
+                      </td>
                     );
                   })}
-                  <td className="px-3 py-2 text-right">{bilanTotaux.reduce((acc, r) => acc + r.totalC, 0)}</td>
-                  <td className="px-3 py-2 text-right">{bilanTotaux.reduce((acc, r) => acc + r.totalM, 0)}</td>
+                  <td className="px-4 py-2 text-center whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {bilanTotaux.reduce((acc, r) => acc + r.totalC, 0)}</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {bilanTotaux.reduce((acc, r) => acc + r.totalM, 0)}</span>
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>

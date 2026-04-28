@@ -5,9 +5,9 @@ export default function BilansPage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Bilans</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="pb-4 border-b border-pea-gray/30">
+          <h1 className="text-3xl font-serif font-semibold tracking-tight text-pea-blue">Bilans</h1>
+          <p className="text-sm text-pea-gray mt-1">
             Planning annuel des bilans clients par mois.
           </p>
         </div>

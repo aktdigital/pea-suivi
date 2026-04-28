@@ -56,9 +56,9 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Clients</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="pb-4 border-b border-pea-gray/30">
+          <h1 className="text-3xl font-serif font-semibold tracking-tight text-pea-blue">Clients</h1>
+          <p className="text-sm text-pea-gray mt-1">
             Référentiel des {(rawClients ?? []).length} clients du cabinet.
           </p>
         </div>
@@ -70,15 +70,15 @@ export default async function ClientsPage({ searchParams }: PageProps) {
             <p className="text-sm">Aucun client pour ces filtres.</p>
           </div>
         ) : (
-          <div className="rounded-lg border overflow-hidden">
+          <div className="rounded-lg border border-pea-gray/20 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Nom</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Prénom</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Conseiller</th>
-                  <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Nb opérations</th>
+                <tr className="border-b bg-pea-blue/5">
+                  <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Nom</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Prénom</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Type</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Conseiller</th>
+                  <th className="text-right px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Nb opérations</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
               </thead>
@@ -86,7 +86,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 {clients.map((client, i) => (
                   <tr
                     key={client.id}
-                    className={`border-b last:border-0 hover:bg-muted/30 ${i % 2 === 0 ? "" : "bg-muted/10"}`}
+                    className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
                   >
                     <td className="px-4 py-2.5 font-medium">{client.nom}</td>
                     <td className="px-4 py-2.5">{client.prenom ?? "—"}</td>

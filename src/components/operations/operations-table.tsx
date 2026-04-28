@@ -122,32 +122,32 @@ export async function OperationsTable({
   }
 
   return (
-    <div className="rounded-lg border overflow-x-auto">
+    <div className="rounded-lg border border-pea-gray/20 overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Date</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Opération</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Client</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Produit</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Compagnie / Contrat</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Montant</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Collecte</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Conseiller</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Statut</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Support</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">ISIN</th>
-            <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Validé</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Courrier PEA</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Lettre mission</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Conformité</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Commentaire</th>
-            <th className="px-3 py-2 font-medium text-muted-foreground"></th>
+          <tr className="border-b bg-pea-blue/5">
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Date</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Opération</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Client</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Produit</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Compagnie / Contrat</th>
+            <th className="text-right px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Montant</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Collecte</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Conseiller</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Statut</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Support</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">ISIN</th>
+            <th className="text-center px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Validé</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Courrier PEA</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Lettre mission</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Conformité</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Commentaire</th>
+            <th className="px-3 py-2"></th>
           </tr>
         </thead>
         <tbody>
           {filtered.map((op, i) => (
-            <tr key={op.id} className={`border-b last:border-0 hover:bg-muted/30 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
+            <tr key={op.id} className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}>
               <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
               <td className="px-3 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
               <td className="px-3 py-2 whitespace-nowrap">
@@ -182,9 +182,9 @@ export async function OperationsTable({
               </td>
               <td className="px-3 py-2 text-center">
                 {op.validation ? (
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-100 text-green-700 text-xs">✓</span>
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-teal/15 text-pea-teal text-xs">✓</span>
                 ) : (
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs">—</span>
+                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-gray/15 text-pea-gray text-xs">—</span>
                 )}
               </td>
               <td className="px-3 py-2 whitespace-nowrap">

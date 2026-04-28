@@ -39,11 +39,11 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
     <div className="flex flex-wrap gap-3 items-end">
       {/* Période */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Période</label>
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Période</label>
         <select
-          value={searchParams.get("mois") ?? `${currentYear}-${String(new Date().getMonth() + 1).padStart(2, "0")}`}
+          value={searchParams.get("mois") ?? ""}
           onChange={(e) => setParam("mois", e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
         >
           <option value="">Tous les mois</option>
           {moisOptions.map((m) => (
@@ -54,11 +54,11 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
 
       {/* Conseiller */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Conseiller</label>
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Conseiller</label>
         <select
           value={searchParams.get("conseiller") ?? ""}
           onChange={(e) => setParam("conseiller", e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
         >
           <option value="">Tous</option>
           {conseillers.map((c) => (
@@ -69,11 +69,11 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
 
       {/* Statut */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Statut</label>
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Statut</label>
         <select
           value={searchParams.get("statut") ?? ""}
           onChange={(e) => setParam("statut", e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
         >
           <option value="">Tous</option>
           {statuts.map((s) => (
@@ -84,11 +84,11 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
 
       {/* Type opération */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Type opération</label>
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Type opération</label>
         <select
           value={searchParams.get("type") ?? ""}
           onChange={(e) => setParam("type", e.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
         >
           <option value="">Tous</option>
           {typeOps.map((t) => (
@@ -99,7 +99,7 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
 
       {/* Recherche client */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Recherche client</label>
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Recherche client</label>
         <Input
           type="search"
           placeholder="Nom du client…"
@@ -111,7 +111,7 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
 
       {/* Filtre contrôles Michèle */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Contrôles</label>
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Contrôles</label>
         <button
           type="button"
           onClick={() => {
@@ -120,8 +120,8 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
           }}
           className={`h-9 rounded-md border px-3 py-1 text-sm shadow-sm transition-colors ${
             searchParams.get("controle_a_faire") === "1"
-              ? "bg-destructive text-destructive-foreground border-destructive"
-              : "border-input bg-background hover:bg-accent"
+              ? "bg-pea-rust text-white border-pea-rust"
+              : "border-pea-gray/30 bg-white text-pea-blue hover:bg-pea-blue/5"
           }`}
         >
           Mes contrôles à faire

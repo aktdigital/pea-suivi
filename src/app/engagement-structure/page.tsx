@@ -41,9 +41,9 @@ export default async function EngagementStructurePage() {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Suivi Engagement Structuré</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+        <div className="pb-4 border-b border-pea-gray/30">
+          <h1 className="text-3xl font-serif font-semibold tracking-tight text-pea-blue">Suivi des engagements structurés</h1>
+          <p className="text-sm text-pea-gray mt-1">
             Suivi opérationnel des produits structurés — enveloppes, réalisations et récap mensuel.
           </p>
         </div>
@@ -51,13 +51,13 @@ export default async function EngagementStructurePage() {
         {/* KPI cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((k) => (
-            <Card key={k.label}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{k.label}</CardTitle>
-                <k.icon className="size-4 text-muted-foreground" />
+            <Card key={k.label} className="border-pea-gray/30 bg-white">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6 pt-6">
+                <CardTitle className="text-xs font-medium text-pea-gray uppercase tracking-wide">{k.label}</CardTitle>
+                <k.icon className="size-4 text-pea-teal" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-semibold">{k.value}</div>
+              <CardContent className="px-6 pb-6">
+                <div className="text-3xl font-serif font-semibold text-pea-blue">{k.value}</div>
               </CardContent>
             </Card>
           ))}
