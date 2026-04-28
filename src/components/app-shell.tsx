@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutDashboard, ListChecks, CalendarRange, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, ListChecks, CalendarRange, Users, LogOut, Layers } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/server";
 
@@ -8,6 +8,7 @@ const NAV = [
   { href: "/operations", label: "Opérations", icon: ListChecks },
   { href: "/bilans", label: "Bilans", icon: CalendarRange },
   { href: "/clients", label: "Clients", icon: Users },
+  { href: "/produits-structures", label: "Produits Structurés", icon: Layers },
 ];
 
 export default async function AppShell({ children }: { children: React.ReactNode }) {
