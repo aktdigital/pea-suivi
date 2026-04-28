@@ -1,24 +1,14 @@
 import AppShell from "@/components/app-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, MOIS } from "@/lib/utils";
 import { ListChecks, Banknote, CalendarRange, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { BilanHebdoTabs } from "@/components/dashboard/bilan-tabs";
+import { ActiviteFilters } from "@/components/dashboard/activite-filters";
 
 const CAMILLE_ID = "ca455682-9567-4132-b5bd-4e18cd99cf01";
 const MYRIAM_ID = "0f1117f0-b185-4d16-ba2e-2a8bc578e14b";
-const MICHELE_ID = "0b21016d-d791-4eb9-b9e2-2ef0247d73ef";
-
-const TYPE_OP_MAP: Record<string, string> = {
-  "SOUSCRIPTION": "Souscriptions",
-  "VERSEMENT COMPLEMENTAIRE": "Versements compl.",
-  "RACHAT PARTIEL": "Rachats",
-  "RACHAT TOTAL": "Rachats",
-  "ARBITRAGE": "Arbitrages",
-  "PASSAGE D'ORDRE": "Passages d'ordre",
-};
-
-const OP_LABELS_ORDER = ["Souscriptions", "Versements compl.", "Rachats", "Arbitrages", "Passages d'ordre"];
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -32,9 +22,9 @@ export default async function DashboardPage() {
   const moisFin = `${year}-${monthStr}-${lastDay}`;
   const todayStr = now.toISOString().split("T")[0];
 
-  // T1 2026 = Jan/Fev/Mars 2026
-  const t1Start = "2026-01-01";
-  const t1End = "2026-03-31";
+  // Jan–Avril 2026 pour les bilan tabs + activité filters
+  const extStart = "2026-01-01";
+  const extEnd = "2026-04-30";
 
   const [
     { data: opsMois },
@@ -42,8 +32,8 @@ export default async function DashboardPage() {
     { data: produitsActifs },
     { data: dernieresOps },
     { data: profiles },
-    { data: opsT1CamilleMyriamRaw },
-    { data: opsMicheleRaw },
+    { data: opsBilanCamilleMyriamRaw },
+    { data: opsActiviteRaw },
   ] = await Promise.all([
     supabase
       .from("operations")
@@ -68,18 +58,19 @@ export default async function DashboardPage() {
     supabase
       .from("profiles")
       .select("id, full_name, email, role"),
+    // Opérations Camille & Myriam Jan-Avril 2026 (pour BilanHebdoTabs)
     supabase
       .from("operations")
       .select("date, type_operation, assistante_id")
       .in("assistante_id", [CAMILLE_ID, MYRIAM_ID])
-      .gte("date", t1Start)
-      .lte("date", t1End),
+      .gte("date", extStart)
+      .lte("date", extEnd),
+    // Toutes ops Jan-Avril 2026 (pour ActiviteFilters)
     supabase
       .from("operations")
-      .select("date, courrier_pea, lettre_mission, conformite, assistante_id")
-      .eq("assistante_id", MICHELE_ID)
-      .gte("date", t1Start)
-      .lte("date", t1End),
+      .select("date, montant, collecte_type, conseiller_code, created_by, assistante_id")
+      .gte("date", extStart)
+      .lte("date", extEnd),
   ]);
 
   const totalNewCash =
@@ -114,92 +105,6 @@ export default async function DashboardPage() {
     },
   ];
 
-  // Bilan hebdo C/M — calcul matrice T1 2026
-  const T1_MOIS = [1, 2, 3]; // Jan, Fev, Mars
-  type BilanRow = { label: string; data: Record<string, number> };
-
-  const bilanMatrix: BilanRow[] = OP_LABELS_ORDER.map((label) => ({
-    label,
-    data: {},
-  }));
-
-  for (const op of opsT1CamilleMyriamRaw ?? []) {
-    const d = new Date(op.date);
-    const m = d.getMonth() + 1;
-    if (!T1_MOIS.includes(m)) continue;
-    const rawLabel = (op.type_operation ?? "").toUpperCase().trim();
-    const mappedLabel = TYPE_OP_MAP[rawLabel];
-    if (!mappedLabel) continue;
-    const isC = op.assistante_id === CAMILLE_ID;
-    const key = `${m}_${isC ? "C" : "M"}`;
-    const row = bilanMatrix.find((r) => r.label === mappedLabel);
-    if (row) row.data[key] = (row.data[key] ?? 0) + 1;
-  }
-
-  // Compute totals per row
-  const bilanTotaux = bilanMatrix.map((row) => {
-    let totalC = 0, totalM = 0;
-    for (const m of T1_MOIS) {
-      totalC += row.data[`${m}_C`] ?? 0;
-      totalM += row.data[`${m}_M`] ?? 0;
-    }
-    return { ...row, totalC, totalM };
-  });
-
-  // Bilan Michèle — mois x statut
-  type MicheleRow = { mois: number; courrierOK: number; lettreOK: number; conformiteOK: number; total: number };
-  const micheleByMois: Record<number, MicheleRow> = {};
-  const DONE_STATUTS = new Set(["ok", "valide", "en_cours_compagnie"]);
-
-  for (const op of opsMicheleRaw ?? []) {
-    const m = new Date(op.date).getMonth() + 1;
-    if (!T1_MOIS.includes(m)) continue;
-    if (!micheleByMois[m]) micheleByMois[m] = { mois: m, courrierOK: 0, lettreOK: 0, conformiteOK: 0, total: 0 };
-    const row = micheleByMois[m];
-    row.total += 1;
-    if (DONE_STATUTS.has(op.courrier_pea ?? "")) row.courrierOK += 1;
-    if (DONE_STATUTS.has(op.lettre_mission ?? "")) row.lettreOK += 1;
-    if (DONE_STATUTS.has(op.conformite ?? "")) row.conformiteOK += 1;
-  }
-
-  // Activité par assistante (created_by dans profiles avec rôle assistante_*)
-  const assistanteProfiles = (profiles ?? []).filter(
-    (p) => p.role?.startsWith("assistante")
-  );
-
-  const activiteAssistantes = assistanteProfiles.map((profile) => {
-    const opsAssistante = (opsMois ?? []).filter(
-      (op) => op.created_by === profile.id || op.assistante_id === profile.id
-    );
-    const volume = opsAssistante.reduce((acc, op) => acc + (op.montant ?? 0), 0);
-    return {
-      name: profile.full_name ?? profile.email ?? profile.id,
-      nbOps: opsAssistante.length,
-      volume,
-    };
-  });
-
-  // Activité par conseiller
-  const conseillerCodes = Array.from(
-    new Set((opsMois ?? []).map((op) => op.conseiller_code).filter(Boolean))
-  ) as string[];
-
-  const activiteConseillers = conseillerCodes.map((code) => {
-    const opsConseiller = (opsMois ?? []).filter((op) => op.conseiller_code === code);
-    const volNewCash = opsConseiller
-      .filter((op) => op.collecte_type === "new_cash")
-      .reduce((acc, op) => acc + (op.montant ?? 0), 0);
-    const volEncours = opsConseiller
-      .filter((op) => op.collecte_type === "encours")
-      .reduce((acc, op) => acc + (op.montant ?? 0), 0);
-    return {
-      code,
-      nbOps: opsConseiller.length,
-      volNewCash,
-      volEncours,
-    };
-  });
-
   return (
     <AppShell>
       <div className="space-y-8">
@@ -225,185 +130,19 @@ export default async function DashboardPage() {
           ))}
         </div>
 
-        {/* Bilan hebdo Camille & Myriam */}
+        {/* Bilan Camille & Myriam — vue mensuelle / hebdomadaire */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Bilan hebdomadaire — Camille &amp; Myriam (T1 2026)</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-pea-blue/5">
-                  <th className="text-left px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Opération</th>
-                  {T1_MOIS.map((m) => (
-                    <th key={m} className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">{MOIS[m - 1]}</th>
-                  ))}
-                  <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Total T1</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bilanTotaux.map((row, i) => (
-                  <tr key={row.label} className={`border-b last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}>
-                    <td className="px-4 py-2 whitespace-nowrap text-pea-graphite">{row.label}</td>
-                    {T1_MOIS.map((m) => {
-                      const c = row.data[`${m}_C`] ?? 0;
-                      const mv = row.data[`${m}_M`] ?? 0;
-                      return (
-                        <td key={m} className="px-4 py-2 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1">
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {c}</span>
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {mv}</span>
-                          </span>
-                        </td>
-                      );
-                    })}
-                    <td className="px-4 py-2 text-center whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {row.totalC}</span>
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {row.totalM}</span>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {/* Ligne total */}
-                <tr className="border-t font-bold bg-pea-blue/5">
-                  <td className="px-4 py-2 whitespace-nowrap text-pea-blue uppercase text-xs tracking-wide">TOTAL</td>
-                  {T1_MOIS.map((m) => {
-                    const totC = bilanTotaux.reduce((acc, r) => acc + (r.data[`${m}_C`] ?? 0), 0);
-                    const totM = bilanTotaux.reduce((acc, r) => acc + (r.data[`${m}_M`] ?? 0), 0);
-                    return (
-                      <td key={m} className="px-4 py-2 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {totC}</span>
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {totM}</span>
-                        </span>
-                      </td>
-                    );
-                  })}
-                  <td className="px-4 py-2 text-center whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">C {bilanTotaux.reduce((acc, r) => acc + r.totalC, 0)}</span>
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">M {bilanTotaux.reduce((acc, r) => acc + r.totalM, 0)}</span>
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </CardContent>
+          <BilanHebdoTabs operations={opsBilanCamilleMyriamRaw ?? []} />
         </Card>
 
-        {/* Contrôles administratifs Michèle */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Contrôles administratifs — Michèle (T1 2026)</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
-            {Object.keys(micheleByMois).length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 pb-4">Aucune donnée pour T1 2026.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Mois</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground whitespace-nowrap">Courrier PEA OK</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground whitespace-nowrap">Lettre mission OK</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground whitespace-nowrap">Conformité OK</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground whitespace-nowrap">Total contrôlés</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {T1_MOIS.map((m, i) => {
-                    const row = micheleByMois[m];
-                    if (!row) return (
-                      <tr key={m} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
-                        <td className="px-4 py-2">{MOIS[m - 1]}</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">—</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">—</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">—</td>
-                        <td className="px-4 py-2 text-right text-muted-foreground">—</td>
-                      </tr>
-                    );
-                    return (
-                      <tr key={m} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
-                        <td className="px-4 py-2 font-medium">{MOIS[m - 1]}</td>
-                        <td className="px-4 py-2 text-right">{row.courrierOK} / {row.total}</td>
-                        <td className="px-4 py-2 text-right">{row.lettreOK} / {row.total}</td>
-                        <td className="px-4 py-2 text-right">{row.conformiteOK} / {row.total}</td>
-                        <td className="px-4 py-2 text-right font-semibold">{row.total}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Activité par assistante */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Activité par assistante — {MOIS[month - 1]}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {activiteAssistantes.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-6 pb-4">Aucune donnée.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Assistante</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Nb ops</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Volume</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activiteAssistantes.map((a) => (
-                      <tr key={a.name} className="border-b last:border-0">
-                        <td className="px-4 py-2">{a.name}</td>
-                        <td className="px-4 py-2 text-right font-medium">{a.nbOps}</td>
-                        <td className="px-4 py-2 text-right font-medium">{formatCurrency(a.volume)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Activité par conseiller */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Activité par conseiller — {MOIS[month - 1]}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {activiteConseillers.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-6 pb-4">Aucune opération ce mois-ci.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Conseiller</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Nb ops</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">New Cash</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Encours</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activiteConseillers.map((c) => (
-                      <tr key={c.code} className="border-b last:border-0">
-                        <td className="px-4 py-2 font-medium">{c.code}</td>
-                        <td className="px-4 py-2 text-right">{c.nbOps}</td>
-                        <td className="px-4 py-2 text-right">{formatCurrency(c.volNewCash)}</td>
-                        <td className="px-4 py-2 text-right">{formatCurrency(c.volEncours)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        {/* Activité par assistante & conseiller avec filtre mois */}
+        <ActiviteFilters
+          operations={opsActiviteRaw ?? []}
+          profiles={profiles ?? []}
+        />
 
         {/* 5 dernières opérations */}
         <Card>
