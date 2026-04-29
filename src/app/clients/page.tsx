@@ -1,6 +1,7 @@
 import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { ClientsFilters } from "@/components/clients/clients-filters";
+import { NouveauClientDialog } from "@/components/clients/nouveau-client-dialog";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight } from "lucide-react";
@@ -56,11 +57,14 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   return (
     <AppShell>
       <div className="space-y-6">
-        <div className="pb-4 border-b border-pea-gray/30">
-          <h1 className="text-3xl font-serif font-semibold tracking-tight text-pea-blue">Clients</h1>
-          <p className="text-sm text-pea-gray mt-1">
-            Référentiel des {(rawClients ?? []).length} clients du cabinet.
-          </p>
+        <div className="pb-4 border-b border-pea-gray/30 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-serif font-semibold tracking-tight text-pea-blue">Clients</h1>
+            <p className="text-sm text-pea-gray mt-1">
+              Référentiel des {(rawClients ?? []).length} clients du cabinet.
+            </p>
+          </div>
+          <NouveauClientDialog conseillers={conseillers ?? []} />
         </div>
 
         <ClientsFilters conseillers={conseillers ?? []} />

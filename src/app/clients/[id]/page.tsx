@@ -37,7 +37,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
       .select("*")
       .eq("client_id", id)
       .order("annee", { ascending: false }),
-    supabase.from("conseillers").select("code, full_name").eq("active", true),
+    supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
   ]);
 
   if (clientError || !client) notFound();
@@ -79,7 +79,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
             <CardTitle className="text-base">Informations</CardTitle>
           </CardHeader>
           <CardContent>
-            <ClientInfoForm client={client} />
+            <ClientInfoForm client={client} conseillers={conseillers ?? []} />
           </CardContent>
         </Card>
 

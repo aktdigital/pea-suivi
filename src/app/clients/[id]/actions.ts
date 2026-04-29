@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function updateClientInfo(
   id: string,
-  data: { email: string; telephone: string; notes: string }
+  data: { email: string; telephone: string; notes: string; conseiller_code: string }
 ) {
   const supabase = await createClient();
 
@@ -15,6 +15,7 @@ export async function updateClientInfo(
       email: data.email || null,
       telephone: data.telephone || null,
       notes: data.notes || null,
+      conseiller_code: data.conseiller_code || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);

@@ -107,10 +107,10 @@ export interface ProduitStructure {
   mecanisme: string | null;
   duree: string | null;
   frequence_rappel: string | null;
-  protection_gain: number | null;
-  protection_capital: number | null;
-  degressivite: boolean | null;
-  objectif_rendement: number | null;
+  protection_gain: string | null;
+  protection_capital: string | null;
+  degressivite: string | null;
+  objectif_rendement: string | null;
   eligible_contrats: string | null;
   upfront_brut: string | null;
   date_fin_commercialisation: string | null;

@@ -12,10 +12,10 @@ interface ProduitStructure {
   mecanisme: string | null;
   duree: string | null;
   frequence_rappel: string | null;
-  protection_gain: number | null;
-  protection_capital: number | null;
-  degressivite: boolean | null;
-  objectif_rendement: number | null;
+  protection_gain: string | null;
+  protection_capital: string | null;
+  degressivite: string | null;
+  objectif_rendement: string | null;
   eligible_contrats: string | null;
   upfront_brut: string | null;
   date_fin_commercialisation: string | null;
@@ -25,6 +25,24 @@ interface ProduitStructure {
   compagnies_cibles: string | null;
   commentaire: string | null;
   active: boolean;
+}
+
+/**
+ * Formate une valeur stockée en texte comme pourcentage.
+ * - Si la valeur contient déjà "%" ou des lettres → on l'affiche telle quelle.
+ * - Sinon on interprète comme un nombre décimal (0.046 → 4,60 %, -0.5 → -50 %).
+ */
+function formatPct(v: string | null | undefined): string {
+  if (!v) return "—";
+  const trimmed = v.trim();
+  if (trimmed.includes("%") || /[a-zA-Z]/.test(trimmed)) return trimmed;
+  const num = parseFloat(trimmed.replace(",", "."));
+  if (Number.isNaN(num)) return trimmed;
+  return new Intl.NumberFormat("fr-FR", {
+    style: "percent",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(num);
 }
 
 export function ProduitCard({ produit }: { produit: ProduitStructure }) {
@@ -123,11 +141,11 @@ export function ProduitCard({ produit }: { produit: ProduitStructure }) {
               <div className="border-t pt-3 space-y-2">
                 <h3 className="font-medium">Sous-jacent & Rendement</h3>
                 <DetailRow label="Sous-jacent" value={produit.sous_jacent} />
-                <DetailRow label="Objectif rendement" value={produit.objectif_rendement != null ? `${produit.objectif_rendement} %` : null} />
-                <DetailRow label="Protection gain" value={produit.protection_gain != null ? `${produit.protection_gain} %` : null} />
-                <DetailRow label="Protection capital" value={produit.protection_capital != null ? `${produit.protection_capital} %` : null} />
-                <DetailRow label="Dégressivité" value={produit.degressivite === null ? null : produit.degressivite ? "Oui" : "Non"} />
-                <DetailRow label="Upfront brut" value={produit.upfront_brut} />
+                <DetailRow label="Objectif rendement" value={formatPct(produit.objectif_rendement)} />
+                <DetailRow label="Protection gain" value={formatPct(produit.protection_gain)} />
+                <DetailRow label="Protection capital" value={formatPct(produit.protection_capital)} />
+                <DetailRowDegressivite value={produit.degressivite} />
+                <DetailRow label="Upfront brut" value={formatPct(produit.upfront_brut)} />
               </div>
 
               <div className="border-t pt-3 space-y-2">
@@ -159,6 +177,34 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
     <div className="flex gap-2">
       <span className="text-muted-foreground min-w-[140px] shrink-0">{label} :</span>
       <span className="font-medium">{value ?? "—"}</span>
+    </div>
+  );
+}
+
+function DetailRowDegressivite({ value }: { value: string | null | undefined }) {
+  if (!value) {
+    return (
+      <div className="flex gap-2">
+        <span className="text-muted-foreground min-w-[140px] shrink-0">Dégressivité :</span>
+        <span className="font-medium">—</span>
+      </div>
+    );
+  }
+  // Si la valeur est purement booléenne (old data)
+  const lower = value.toString().toLowerCase();
+  if (lower === "true" || lower === "false") {
+    return (
+      <div className="flex gap-2">
+        <span className="text-muted-foreground min-w-[140px] shrink-0">Dégressivité :</span>
+        <span className="font-medium">{lower === "true" ? "Oui" : "Non"}</span>
+      </div>
+    );
+  }
+  // Valeur texte descriptive
+  return (
+    <div className="flex gap-2">
+      <span className="text-muted-foreground min-w-[140px] shrink-0">Dégressivité :</span>
+      <span className="font-medium text-xs leading-relaxed whitespace-pre-line">{value}</span>
     </div>
   );
 }
