@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -151,7 +152,16 @@ export async function OperationsTable({
               <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
               <td className="px-3 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
               <td className="px-3 py-2 whitespace-nowrap">
-                {op.clients ? `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim() : "—"}
+                {op.clients && op.client_id ? (
+                  <Link
+                    href={`/clients/${op.client_id}`}
+                    className="hover:underline hover:text-pea-teal transition-colors"
+                  >
+                    {`${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()}
+                  </Link>
+                ) : op.clients ? (
+                  `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()
+                ) : "—"}
               </td>
               <td className="px-3 py-2 whitespace-nowrap">{op.produit ?? "—"}</td>
               <td className="px-3 py-2 whitespace-nowrap">

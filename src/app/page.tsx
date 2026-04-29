@@ -2,7 +2,8 @@ import AppShell from "@/components/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, MOIS } from "@/lib/utils";
-import { ListChecks, Banknote, CalendarRange, Layers } from "lucide-react";
+import { ListChecks, Banknote, Layers } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { BilanHebdoTabs } from "@/components/dashboard/bilan-tabs";
 import { ActiviteFilters } from "@/components/dashboard/activite-filters";
@@ -28,7 +29,6 @@ export default async function DashboardPage() {
 
   const [
     { data: opsMois },
-    { data: bilansAFaire },
     { data: produitsActifs },
     { data: dernieresOps },
     { data: profiles },
@@ -41,18 +41,13 @@ export default async function DashboardPage() {
       .gte("date", moisDebut)
       .lte("date", moisFin),
     supabase
-      .from("bilans")
-      .select("id")
-      .in("statut", ["a_faire", "planifie"])
-      .eq("annee", year),
-    supabase
       .from("produits_structures")
       .select("isin")
       .eq("active", true)
       .gte("date_fin_commercialisation", todayStr),
     supabase
       .from("operations")
-      .select("id, date, type_operation, montant, statut, clients(nom, prenom), conseiller_code")
+      .select("id, date, type_operation, montant, statut, client_id, clients(nom, prenom), conseiller_code")
       .order("created_at", { ascending: false })
       .limit(5),
     supabase
@@ -92,12 +87,6 @@ export default async function DashboardPage() {
       suffix: "",
     },
     {
-      label: "Bilans à faire",
-      value: (bilansAFaire ?? []).length,
-      icon: CalendarRange,
-      suffix: "",
-    },
-    {
       label: "Produits structurés actifs",
       value: (produitsActifs ?? []).length,
       icon: Layers,
@@ -116,7 +105,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* KPI cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {kpis.map((k) => (
             <Card key={k.label} className="border-pea-gray/30 bg-white">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6 pt-6">
@@ -174,7 +163,16 @@ export default async function DashboardPage() {
                       <tr key={op.id} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
                         <td className="px-4 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
                         <td className="px-4 py-2 whitespace-nowrap">
-                          {clientData ? `${clientData.nom} ${clientData.prenom ?? ""}`.trim() : "—"}
+                          {clientData && op.client_id ? (
+                            <Link
+                              href={`/clients/${op.client_id}`}
+                              className="hover:underline hover:text-pea-teal transition-colors"
+                            >
+                              {`${clientData.nom} ${clientData.prenom ?? ""}`.trim()}
+                            </Link>
+                          ) : clientData ? (
+                            `${clientData.nom} ${clientData.prenom ?? ""}`.trim()
+                          ) : "—"}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
                         <td className="px-4 py-2 text-right whitespace-nowrap font-medium">

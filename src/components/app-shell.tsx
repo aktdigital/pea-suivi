@@ -1,13 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, ListChecks, CalendarRange, Users, LogOut, Layers, TrendingUp } from "lucide-react";
+import { LayoutDashboard, ListChecks, Users, LogOut, Layers, TrendingUp } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/server";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/operations", label: "Opérations", icon: ListChecks },
-  { href: "/bilans", label: "Bilans", icon: CalendarRange },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/produits-structures", label: "Produits Structurés", icon: Layers },
   { href: "/engagement-structure", label: "Suivi des engagements structurés", icon: TrendingUp },
@@ -33,7 +32,9 @@ export default async function AppShell({ children }: { children: React.ReactNode
       <aside className="w-64 flex flex-col" style={{ backgroundColor: "#284460" }}>
         {/* Logo */}
         <div className="px-5 py-6 flex flex-col items-start gap-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.10)" }}>
-          <Image src="/pea-logo-blanc.svg" alt="PEA" width={100} height={48} priority />
+          <Link href="/" className="cursor-pointer transition-opacity hover:opacity-90">
+            <Image src="/pea-logo-blanc.svg" alt="PEA" width={100} height={48} priority />
+          </Link>
           <span className="text-xs tracking-wide uppercase" style={{ color: "rgba(255,255,255,0.60)" }}>
             Pôle assistance commerciale
           </span>

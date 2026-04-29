@@ -88,7 +88,14 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     key={client.id}
                     className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
                   >
-                    <td className="px-4 py-2.5 font-medium">{client.nom}</td>
+                    <td className="px-4 py-2.5 font-medium">
+                      <Link
+                        href={`/clients/${client.id}`}
+                        className="hover:underline hover:text-pea-teal transition-colors"
+                      >
+                        {client.nom}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2.5">{client.prenom ?? "—"}</td>
                     <td className="px-4 py-2.5">
                       <Badge variant={client.type_personne === "morale" ? "secondary" : "outline"}>
