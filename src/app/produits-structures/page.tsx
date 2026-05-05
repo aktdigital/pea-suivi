@@ -4,9 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { ProduitCard } from "@/components/produits-structures/produit-card";
 import { ProduitsFilter } from "@/components/produits-structures/produits-filter";
 import { ProduitsSearch } from "@/components/produits-structures/produits-search";
+import { NouveauProduitDialog } from "@/components/produits-structures/nouveau-produit-dialog";
 
 interface PageProps {
   searchParams: Promise<{ filter?: string; q?: string }>;
+}
+
+function unique(arr: (string | null | undefined)[]): string[] {
+  return [...new Set(arr.filter((v): v is string => Boolean(v)))].sort();
 }
 
 export default async function ProduitsStructuresPage({ searchParams }: PageProps) {
@@ -27,9 +32,22 @@ export default async function ProduitsStructuresPage({ searchParams }: PageProps
     query = query.gte("date_fin_commercialisation", today);
   }
 
-  const { data: allProduits, error } = await query;
+  const [
+    { data: allProduits, error },
+    { data: allForDistinct },
+    { data: refFrequences },
+    { data: refCompagnies },
+  ] = await Promise.all([
+    query,
+    supabase
+      .from("produits_structures")
+      .select("mecanisme, duree, eligible_contrats, structureur")
+      .eq("active", true),
+    supabase.from("ref_frequences").select("id, label, ordre").order("ordre"),
+    supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
+  ]);
 
-  // Filtre textuel côté JS (ISIN exact/contient + nom contient, case-insensitive)
+  // Filtrage textuel
   const produits = q
     ? (allProduits ?? []).filter(
         (p) =>
@@ -38,14 +56,31 @@ export default async function ProduitsStructuresPage({ searchParams }: PageProps
       )
     : (allProduits ?? []);
 
+  // Listes distinctes pour le dialog de création
+  const mecanismes = unique((allForDistinct ?? []).map((p) => p.mecanisme));
+  const durees = unique((allForDistinct ?? []).map((p) => p.duree));
+  const eligibleContrats = unique((allForDistinct ?? []).map((p) => p.eligible_contrats));
+  const structureurs = unique((allForDistinct ?? []).map((p) => p.structureur));
+  const frequences = (refFrequences ?? []).map((f) => f.label);
+
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Produits Structurés</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Catalogue des produits structurés — Phoenix, Autocall, etc.
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Produits Structurés</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Catalogue des produits structurés — Phoenix, Autocall, etc.
+            </p>
+          </div>
+          <NouveauProduitDialog
+            mecanismes={mecanismes}
+            durees={durees}
+            frequences={frequences}
+            eligibleContrats={eligibleContrats}
+            compagnies={refCompagnies ?? []}
+            structureurs={structureurs}
+          />
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
