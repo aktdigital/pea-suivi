@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { ProduitStructure } from "@/lib/types";
+import { FacturationCell } from "./facturation-edit-dialog";
 
 const MOIS_ORDER = [
   "janvier", "février", "mars", "avril", "mai", "juin",
@@ -27,6 +28,31 @@ function formatUpfront(val: string | null): string {
 interface Props {
   produits: ProduitStructure[];
   compagnies: { id: number; label: string }[];
+}
+
+function StatutBadge({ statut }: { statut: string | null }) {
+  if (statut === "E") {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-blue/10 text-pea-blue" title="Enregistré e-Capital">
+        E
+      </span>
+    );
+  }
+  if (statut === "F") {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-teal/15 text-pea-teal" title="Facturé">
+        F
+      </span>
+    );
+  }
+  if (statut === "D") {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-gold/20 text-[#7a5530]" title="À définir">
+        D
+      </span>
+    );
+  }
+  return <span className="text-muted-foreground">—</span>;
 }
 
 function ProduitRow({ produit, index }: { produit: ProduitStructure; index: number }) {
@@ -56,16 +82,21 @@ function ProduitRow({ produit, index }: { produit: ProduitStructure; index: numb
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.total_new_cash)}</td>
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.total_encours)}</td>
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs font-medium">{formatCurrency(produit.ca_up_front)}</td>
-      <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{produit.date_facturation ? formatDate(produit.date_facturation) : "—"}</td>
-      <td className="px-3 py-2 whitespace-nowrap text-xs">
-        {produit.statut_facturation === "E" ? (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-blue/10 text-pea-blue" title="Enregistré e-Capital">E</span>
-        ) : produit.statut_facturation === "F" ? (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-teal/15 text-pea-teal" title="Facturé">F</span>
-        ) : produit.statut_facturation === "D" ? (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-gold/20 text-[#7a5530]" title="À définir">D</span>
-        ) : "—"}
+
+      {/* Date facturation — cellule cliquable */}
+      <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
+        <FacturationCell produit={produit}>
+          <span>{produit.date_facturation ? formatDate(produit.date_facturation) : "—"}</span>
+        </FacturationCell>
       </td>
+
+      {/* Statut facturation — cellule cliquable */}
+      <td className="px-3 py-2 whitespace-nowrap text-xs">
+        <FacturationCell produit={produit}>
+          <StatutBadge statut={produit.statut_facturation} />
+        </FacturationCell>
+      </td>
+
       <td className="px-3 py-2 whitespace-nowrap text-xs">{capitalize(produit.mois_creation)}</td>
     </tr>
   );
@@ -170,6 +201,7 @@ export function EngagementTable({ produits, compagnies }: Props) {
   const [filterMois, setFilterMois] = useState<string>("tous");
   const [filterStructureur, setFilterStructureur] = useState<string>("tous");
   const [filterCompagnie, setFilterCompagnie] = useState<string>("tous");
+  const [filterStatut, setFilterStatut] = useState<string>("tous");
 
   // Listes distinctes pour les filtres
   const moisDisponibles = useMemo(() => {
@@ -199,9 +231,12 @@ export function EngagementTable({ produits, compagnies }: Props) {
       const okMois = filterMois === "tous" || (p.mois_creation?.toLowerCase() === filterMois);
       const okStructureur = filterStructureur === "tous" || p.structureur === filterStructureur;
       const okCompagnie = filterCompagnie === "tous" || (p.compagnies_cibles ?? "").toLowerCase().includes(filterCompagnie.toLowerCase());
-      return okMois && okStructureur && okCompagnie;
+      const okStatut =
+        filterStatut === "tous" ||
+        (filterStatut === "null" ? p.statut_facturation === null : p.statut_facturation === filterStatut);
+      return okMois && okStructureur && okCompagnie && okStatut;
     });
-  }, [sorted, filterMois, filterStructureur, filterCompagnie]);
+  }, [sorted, filterMois, filterStructureur, filterCompagnie, filterStatut]);
 
   return (
     <div className="space-y-6">
@@ -244,6 +279,20 @@ export function EngagementTable({ produits, compagnies }: Props) {
             {compagnies.map((c) => (
               <option key={c.id} value={c.label}>{c.label}</option>
             ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Statut facturation :</label>
+          <select
+            value={filterStatut}
+            onChange={(e) => setFilterStatut(e.target.value)}
+            className="text-xs border rounded px-2 py-1 bg-background"
+          >
+            <option value="tous">Tous statuts</option>
+            <option value="null">Sans statut</option>
+            <option value="E">E — Enregistré e-Capital</option>
+            <option value="F">F — Facturé</option>
+            <option value="D">D — À définir</option>
           </select>
         </div>
         <span className="text-xs text-muted-foreground self-center">{filtered.length} produit(s)</span>
