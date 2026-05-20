@@ -9,9 +9,11 @@ interface FiltersProps {
   conseillers: { code: string; full_name: string }[];
   statuts: { id: number; label: string }[];
   typeOps: { id: number; label: string }[];
+  assistantes: { id: string; full_name: string | null; email: string | null }[];
+  compagnies: { id: number; label: string }[];
 }
 
-export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProps) {
+export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, compagnies }: FiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -109,23 +111,46 @@ export function OperationsFilters({ conseillers, statuts, typeOps }: FiltersProp
         />
       </div>
 
-      {/* Filtre contrôles Michèle */}
+      {/* Par (assistante) */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Contrôles</label>
-        <button
-          type="button"
-          onClick={() => {
-            const current = searchParams.get("controle_a_faire");
-            setParam("controle_a_faire", current === "1" ? "" : "1");
-          }}
-          className={`h-9 rounded-md border px-3 py-1 text-sm shadow-sm transition-colors ${
-            searchParams.get("controle_a_faire") === "1"
-              ? "bg-pea-rust text-white border-pea-rust"
-              : "border-pea-gray/30 bg-white text-pea-blue hover:bg-pea-blue/5"
-          }`}
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Par</label>
+        <select
+          value={searchParams.get("par") ?? ""}
+          onChange={(e) => setParam("par", e.target.value)}
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
         >
-          Mes contrôles à faire
-        </button>
+          <option value="">Toutes</option>
+          {assistantes.map((a) => (
+            <option key={a.id} value={a.id}>{a.full_name ?? a.email ?? a.id}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* ISIN */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">ISIN</label>
+        <Input
+          type="search"
+          placeholder="Code ISIN…"
+          defaultValue={searchParams.get("isin") ?? ""}
+          onChange={(e) => setParam("isin", e.target.value)}
+          className="w-36"
+        />
+      </div>
+
+      {/* Compagnie */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Compagnie</label>
+        <select
+          value={searchParams.get("compagnie") ?? ""}
+          onChange={(e) => setParam("compagnie", e.target.value)}
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
+        >
+          <option value="">Toutes</option>
+          {compagnies.map((c) => (
+            <option key={c.id} value={c.label}>{c.label}</option>
+          ))}
+        </select>
       </div>
     </div>
   );

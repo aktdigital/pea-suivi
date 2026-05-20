@@ -8,10 +8,10 @@ import { EngagementTable } from "@/components/engagement-structure/engagement-ta
 export default async function EngagementStructurePage() {
   const supabase = await createClient();
 
-  const { data: produits, error } = await supabase
-    .from("produits_structures")
-    .select("*")
-    .eq("active", true);
+  const [{ data: produits, error }, { data: refCompagnies }] = await Promise.all([
+    supabase.from("produits_structures").select("*").eq("active", true),
+    supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("label"),
+  ]);
 
   if (error) {
     return (
@@ -72,7 +72,7 @@ export default async function EngagementStructurePage() {
         </div>
 
         {/* Tableau + filtres + récap */}
-        <EngagementTable produits={all} />
+        <EngagementTable produits={all} compagnies={refCompagnies ?? []} />
       </div>
     </AppShell>
   );

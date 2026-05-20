@@ -11,6 +11,9 @@ interface OperationsTableProps {
   type?: string;
   q?: string;
   controleAFaire?: boolean;
+  par?: string;
+  isin?: string;
+  compagnie?: string;
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -28,6 +31,9 @@ export async function OperationsTable({
   type,
   q,
   controleAFaire,
+  par,
+  isin,
+  compagnie,
   clients,
   conseillers,
   typeOps,
@@ -63,6 +69,9 @@ export async function OperationsTable({
   if (conseiller) query = query.eq("conseiller_code", conseiller);
   if (statut) query = query.eq("statut", statut);
   if (type) query = query.eq("type_operation", type);
+  if (par) query = query.eq("created_by", par);
+  if (isin) query = query.ilike("isin", `%${isin}%`);
+  if (compagnie) query = query.eq("compagnie", compagnie);
 
   const { data: operations, error } = await query;
 
@@ -107,6 +116,7 @@ export async function OperationsTable({
         <thead>
           <tr className="border-b bg-pea-blue/5">
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Date</th>
+            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Date fin</th>
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Opération</th>
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Client</th>
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Produit</th>

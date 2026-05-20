@@ -45,6 +45,16 @@ function getControleLabel(statut: StatutControle | null | undefined): string {
   return statut;
 }
 
+function statutBgClass(statut: string | null): string {
+  if (!statut) return "bg-white";
+  const s = statut.toLowerCase();
+  if (s.includes("à saisir") || s.includes("a saisir")) return "bg-white";
+  if (s.includes("validé") && s.includes("avenant")) return "bg-green-100";
+  if (s.includes("signé") && (s.includes("envoyé") || s.includes("transmis"))) return "bg-orange-100";
+  if (s.includes("envoyé") || s.includes("envoyée")) return "bg-yellow-50";
+  return "bg-white";
+}
+
 function getStatutVariant(statut: string | null): "default" | "success" | "warning" | "destructive" | "outline" {
   if (!statut) return "outline";
   const s = statut.toLowerCase();
@@ -77,9 +87,10 @@ export function OperationRow({
     <tr
       key={op.id}
       onClick={handleRowClick}
-      className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 cursor-pointer ${index % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
+      className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 cursor-pointer ${statutBgClass(op.statut)}`}
     >
       <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{op.date_fin ? formatDate(op.date_fin) : "—"}</td>
       <td className="px-3 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
       <td className="px-3 py-2 whitespace-nowrap" data-no-row-click>
         {op.clients && op.client_id ? (

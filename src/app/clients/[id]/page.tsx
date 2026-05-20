@@ -3,7 +3,7 @@ import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency, formatDate, MOIS } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { ClientInfoForm } from "./client-info-form";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -19,7 +19,6 @@ export default async function ClientDetailPage({ params }: PageProps) {
   const [
     { data: client, error: clientError },
     { data: operations },
-    { data: bilans },
     { data: conseillers },
     { data: assistantes },
   ] = await Promise.all([
@@ -33,11 +32,6 @@ export default async function ClientDetailPage({ params }: PageProps) {
       .select("*")
       .eq("client_id", id)
       .order("date", { ascending: false }),
-    supabase
-      .from("bilans")
-      .select("*")
-      .eq("client_id", id)
-      .order("annee", { ascending: false }),
     supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
     supabase
       .from("profiles")
@@ -141,53 +135,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
           </CardContent>
         </Card>
 
-        {/* Section Bilans */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Bilans 2026 ({(bilans ?? []).filter((b) => b.annee === 2026).length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {(bilans ?? []).filter((b) => b.annee === 2026).length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 pb-4">
-                Aucun bilan planifié pour 2026.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Mois planifié</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date réalisé</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(bilans ?? [])
-                      .filter((b) => b.annee === 2026)
-                      .map((bilan, i) => (
-                        <tr
-                          key={bilan.id}
-                          className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}
-                        >
-                          <td className="px-4 py-2">
-                            {bilan.mois_planifie ? MOIS[bilan.mois_planifie - 1] : "—"}
-                          </td>
-                          <td className="px-4 py-2">
-                            {formatDate(bilan.date_realise)}
-                          </td>
-                          <td className="px-4 py-2">
-                            <Badge variant="outline">{bilan.statut}</Badge>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Section Bilans — masquée */}
       </div>
     </AppShell>
   );

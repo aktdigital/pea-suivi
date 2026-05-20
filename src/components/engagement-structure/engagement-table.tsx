@@ -26,6 +26,7 @@ function formatUpfront(val: string | null): string {
 
 interface Props {
   produits: ProduitStructure[];
+  compagnies: { id: number; label: string }[];
 }
 
 function ProduitRow({ produit, index }: { produit: ProduitStructure; index: number }) {
@@ -55,6 +56,16 @@ function ProduitRow({ produit, index }: { produit: ProduitStructure; index: numb
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.total_new_cash)}</td>
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs">{formatCurrency(produit.total_encours)}</td>
       <td className="px-3 py-2 whitespace-nowrap text-right text-xs font-medium">{formatCurrency(produit.ca_up_front)}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{produit.date_facturation ? formatDate(produit.date_facturation) : "—"}</td>
+      <td className="px-3 py-2 whitespace-nowrap text-xs">
+        {produit.statut_facturation === "E" ? (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-blue/10 text-pea-blue" title="Enregistré e-Capital">E</span>
+        ) : produit.statut_facturation === "F" ? (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-teal/15 text-pea-teal" title="Facturé">F</span>
+        ) : produit.statut_facturation === "D" ? (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-pea-gold/20 text-[#7a5530]" title="À définir">D</span>
+        ) : "—"}
+      </td>
       <td className="px-3 py-2 whitespace-nowrap text-xs">{capitalize(produit.mois_creation)}</td>
     </tr>
   );
@@ -155,9 +166,10 @@ function RecapMensuel({ produits }: { produits: ProduitStructure[] }) {
   );
 }
 
-export function EngagementTable({ produits }: Props) {
+export function EngagementTable({ produits, compagnies }: Props) {
   const [filterMois, setFilterMois] = useState<string>("tous");
   const [filterStructureur, setFilterStructureur] = useState<string>("tous");
+  const [filterCompagnie, setFilterCompagnie] = useState<string>("tous");
 
   // Listes distinctes pour les filtres
   const moisDisponibles = useMemo(() => {
@@ -186,9 +198,10 @@ export function EngagementTable({ produits }: Props) {
     return sorted.filter((p) => {
       const okMois = filterMois === "tous" || (p.mois_creation?.toLowerCase() === filterMois);
       const okStructureur = filterStructureur === "tous" || p.structureur === filterStructureur;
-      return okMois && okStructureur;
+      const okCompagnie = filterCompagnie === "tous" || (p.compagnies_cibles ?? "").toLowerCase().includes(filterCompagnie.toLowerCase());
+      return okMois && okStructureur && okCompagnie;
     });
-  }, [sorted, filterMois, filterStructureur]);
+  }, [sorted, filterMois, filterStructureur, filterCompagnie]);
 
   return (
     <div className="space-y-6">
@@ -220,6 +233,19 @@ export function EngagementTable({ produits }: Props) {
             ))}
           </select>
         </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground font-medium whitespace-nowrap">Compagnie :</label>
+          <select
+            value={filterCompagnie}
+            onChange={(e) => setFilterCompagnie(e.target.value)}
+            className="text-xs border rounded px-2 py-1 bg-background"
+          >
+            <option value="tous">Toutes compagnies</option>
+            {compagnies.map((c) => (
+              <option key={c.id} value={c.label}>{c.label}</option>
+            ))}
+          </select>
+        </div>
         <span className="text-xs text-muted-foreground self-center">{filtered.length} produit(s)</span>
       </div>
 
@@ -240,13 +266,15 @@ export function EngagementTable({ produits }: Props) {
               <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Total New Cash</th>
               <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Total Encours</th>
               <th className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">CA UP FRONT</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Date facturation</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Statut facturation</th>
               <th className="text-left px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">Mois de création</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                <td colSpan={15} className="px-4 py-8 text-center text-muted-foreground text-sm">
                   Aucun produit pour ces filtres.
                 </td>
               </tr>
