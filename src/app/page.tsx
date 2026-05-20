@@ -47,7 +47,11 @@ export default async function DashboardPage() {
       .gte("date_fin_commercialisation", todayStr),
     supabase
       .from("operations")
-      .select("id, date, type_operation, montant, statut, client_id, clients(nom, prenom), conseiller_code")
+      .select(`
+        id, date, type_operation, montant, statut, client_id, conseiller_code,
+        clients(nom, prenom),
+        created_by_profile:profiles!operations_created_by_fkey(id, full_name)
+      `)
       .order("created_at", { ascending: false })
       .limit(5),
     supabase
@@ -150,6 +154,7 @@ export default async function DashboardPage() {
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground">Type</th>
                     <th className="text-right px-4 py-2 font-medium text-muted-foreground">Montant</th>
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground">Conseiller</th>
+                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Par</th>
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground">Statut</th>
                   </tr>
                 </thead>
@@ -159,6 +164,10 @@ export default async function DashboardPage() {
                     const clientData = Array.isArray(rawClient)
                       ? (rawClient[0] as { nom: string; prenom: string | null } | undefined) ?? null
                       : (rawClient as { nom: string; prenom: string | null } | null);
+                    const rawCreator = op.created_by_profile;
+                    const creatorName = Array.isArray(rawCreator)
+                      ? (rawCreator[0] as { full_name: string | null } | undefined)?.full_name ?? null
+                      : (rawCreator as { full_name: string | null } | null)?.full_name ?? null;
                     return (
                       <tr key={op.id} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
                         <td className="px-4 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
@@ -179,6 +188,9 @@ export default async function DashboardPage() {
                           {formatCurrency(op.montant)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap">{op.conseiller_code ?? "—"}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-muted-foreground text-xs">
+                          {creatorName ?? "—"}
+                        </td>
                         <td className="px-4 py-2 whitespace-nowrap">
                           {op.statut ? (
                             <Badge variant="outline">{op.statut}</Badge>

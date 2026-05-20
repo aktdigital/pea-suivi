@@ -16,6 +16,8 @@ interface RowActionsProps {
   statuts: { id: number; label: string }[];
   compagnies: { id: number; label: string }[];
   produitsStructures: { isin: string; nom_produit: string }[];
+  externalEditOpen?: boolean;
+  onExternalEditClose?: () => void;
 }
 
 export function OperationRowActions({
@@ -27,9 +29,21 @@ export function OperationRowActions({
   statuts,
   compagnies,
   produitsStructures,
+  externalEditOpen,
+  onExternalEditClose,
 }: RowActionsProps) {
   const [deleting, setDeleting] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [internalEditOpen, setInternalEditOpen] = useState(false);
+
+  const editOpen = externalEditOpen ?? internalEditOpen;
+  function setEditOpen(val: boolean) {
+    if (val) {
+      setInternalEditOpen(true);
+    } else {
+      setInternalEditOpen(false);
+      onExternalEditClose?.();
+    }
+  }
 
   async function handleDelete() {
     if (!confirm("Supprimer cette opération ?")) return;
