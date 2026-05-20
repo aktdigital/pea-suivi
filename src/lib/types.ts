@@ -30,6 +30,7 @@ export interface Client {
   prenom: string | null;
   type_personne: TypePersonne;
   conseiller_code: string | null;
+  assistante_profile_id: string | null;
   email: string | null;
   telephone: string | null;
   notes: string | null;

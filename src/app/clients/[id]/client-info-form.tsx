@@ -11,12 +11,20 @@ interface Conseiller {
   full_name: string | null;
 }
 
+interface Assistante {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
+}
+
 interface ClientInfoFormProps {
   client: Client;
   conseillers: Conseiller[];
+  assistantes: Assistante[];
 }
 
-export function ClientInfoForm({ client, conseillers }: ClientInfoFormProps) {
+export function ClientInfoForm({ client, conseillers, assistantes }: ClientInfoFormProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +39,7 @@ export function ClientInfoForm({ client, conseillers }: ClientInfoFormProps) {
       telephone: String(fd.get("telephone") || ""),
       notes: String(fd.get("notes") || ""),
       conseiller_code: String(fd.get("conseiller_code") || ""),
+      assistante_profile_id: String(fd.get("assistante_profile_id") || ""),
     });
     setSaving(false);
     if (result?.error) {
@@ -47,6 +56,13 @@ export function ClientInfoForm({ client, conseillers }: ClientInfoFormProps) {
     return c.full_name ? `${c.full_name} (${c.code})` : c.code;
   };
 
+  const assistanteLabel = (profileId: string | null) => {
+    if (!profileId) return "—";
+    const a = assistantes.find((x) => x.id === profileId);
+    if (!a) return "—";
+    return a.full_name ?? a.email ?? profileId;
+  };
+
   if (!editing) {
     return (
       <div className="space-y-4">
@@ -54,6 +70,10 @@ export function ClientInfoForm({ client, conseillers }: ClientInfoFormProps) {
           <div>
             <span className="text-muted-foreground">Conseiller</span>
             <p className="font-medium mt-0.5">{conseillerLabel(client.conseiller_code)}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Assistante</span>
+            <p className="font-medium mt-0.5">{assistanteLabel(client.assistante_profile_id ?? null)}</p>
           </div>
           <div>
             <span className="text-muted-foreground">Email</span>
@@ -91,6 +111,21 @@ export function ClientInfoForm({ client, conseillers }: ClientInfoFormProps) {
             {conseillers.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.full_name ? `${c.full_name} (${c.code})` : c.code}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Assistante</label>
+          <select
+            name="assistante_profile_id"
+            defaultValue={client.assistante_profile_id ?? ""}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option value="">Aucune</option>
+            {assistantes.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.full_name ?? a.email ?? a.id}
               </option>
             ))}
           </select>

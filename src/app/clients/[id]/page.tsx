@@ -21,6 +21,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
     { data: operations },
     { data: bilans },
     { data: conseillers },
+    { data: assistantes },
   ] = await Promise.all([
     supabase
       .from("clients")
@@ -38,6 +39,11 @@ export default async function ClientDetailPage({ params }: PageProps) {
       .eq("client_id", id)
       .order("annee", { ascending: false }),
     supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, role")
+      .in("role", ["assistante_commerciale", "assistante_admin"])
+      .order("full_name"),
   ]);
 
   if (clientError || !client) notFound();
@@ -79,7 +85,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
             <CardTitle className="text-base">Informations</CardTitle>
           </CardHeader>
           <CardContent>
-            <ClientInfoForm client={client} conseillers={conseillers ?? []} />
+            <ClientInfoForm client={client} conseillers={conseillers ?? []} assistantes={assistantes ?? []} />
           </CardContent>
         </Card>
 

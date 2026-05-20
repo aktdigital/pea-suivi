@@ -14,12 +14,16 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: conseillers }, { data: rawClients }] = await Promise.all([
+  const [{ data: conseillers }, { data: rawClients }, { data: assistantesData }] = await Promise.all([
     supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
     supabase
       .from("clients")
-      .select("id, nom, prenom, type_personne, conseiller_code")
+      .select("id, nom, prenom, type_personne, conseiller_code, assistante_profile_id")
       .order("nom"),
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, role")
+      .in("role", ["assistante_commerciale", "assistante_admin"]),
   ]);
 
   let clients = rawClients ?? [];
@@ -54,6 +58,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     conseillerMap[c.code] = c.full_name;
   }
 
+  const assistanteMap: Record<string, string> = {};
+  for (const a of assistantesData ?? []) {
+    assistanteMap[a.id] = a.full_name ?? a.email ?? a.id;
+  }
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -82,6 +91,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Prénom</th>
                   <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Type</th>
                   <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Conseiller</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Assistante</th>
                   <th className="text-right px-4 py-2.5 font-medium text-pea-blue uppercase tracking-wide text-xs">Nb opérations</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
@@ -109,6 +119,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     <td className="px-4 py-2.5 text-muted-foreground">
                       {client.conseiller_code
                         ? `${conseillerMap[client.conseiller_code] ?? client.conseiller_code} (${client.conseiller_code})`
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      {client.assistante_profile_id
+                        ? (assistanteMap[client.assistante_profile_id] ?? "—")
                         : "—"}
                     </td>
                     <td className="px-4 py-2.5 text-right">
