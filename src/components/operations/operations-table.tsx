@@ -47,7 +47,7 @@ export async function OperationsTable({
   let query = supabase
     .from("operations")
     .select(`
-      *,
+      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
       clients(nom, prenom),
       created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
     `)

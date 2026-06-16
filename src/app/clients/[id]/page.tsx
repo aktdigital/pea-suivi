@@ -7,6 +7,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { ClientInfoForm } from "./client-info-form";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import type { Client } from "@/lib/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -24,12 +25,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
   ] = await Promise.all([
     supabase
       .from("clients")
-      .select("*")
+      .select("id, nom, prenom, type_personne, conseiller_code, assistante_profile_id, email, telephone, notes, created_at, updated_at")
       .eq("id", id)
       .single(),
     supabase
       .from("operations")
-      .select("*")
+      .select("id, date, type_operation, produit, compagnie, montant, statut")
       .eq("client_id", id)
       .order("date", { ascending: false }),
     supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
@@ -41,6 +42,9 @@ export default async function ClientDetailPage({ params }: PageProps) {
   ]);
 
   if (clientError || !client) notFound();
+
+  // Cast DB row to app Client type (type_personne is narrowed to TypePersonne)
+  const typedClient = client as Client;
 
   const conseillerMap: Record<string, string> = {};
   for (const c of conseillers ?? []) {
@@ -79,7 +83,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
             <CardTitle className="text-base">Informations</CardTitle>
           </CardHeader>
           <CardContent>
-            <ClientInfoForm client={client} conseillers={conseillers ?? []} assistantes={assistantes ?? []} />
+            <ClientInfoForm client={typedClient} conseillers={conseillers ?? []} assistantes={assistantes ?? []} />
           </CardContent>
         </Card>
 

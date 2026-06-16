@@ -1,0 +1,14 @@
+# Supabase project config — pea-suivi
+# Rattachement : `supabase link --project-ref upgtplrxdnocjeykjeqj`
+project_id = "upgtplrxdnocjeykjeqj"
+
+[db]
+# Version Postgres du projet distant (eu-west-3 / Paris)
+major_version = 15
+
+[auth]
+# Sécurité mots de passe — voir supabase/README.md (#4)
+# La protection "mots de passe compromis" (HaveIBeenPwned) n'est PAS pilotable
+# par migration : à activer dans le Dashboard > Authentication > Policies.
+enable_confirmations = false
+minimum_password_length = 8

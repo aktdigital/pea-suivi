@@ -7,9 +7,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { BilanHebdoTabs } from "@/components/dashboard/bilan-tabs";
 import { ActiviteFilters } from "@/components/dashboard/activite-filters";
-
-const CAMILLE_ID = "ca455682-9567-4132-b5bd-4e18cd99cf01";
-const MYRIAM_ID = "0f1117f0-b185-4d16-ba2e-2a8bc578e14b";
+import { CAMILLE_ID, MYRIAM_ID } from "@/lib/constants";
 
 export default async function DashboardPage() {
   const supabase = await createClient();

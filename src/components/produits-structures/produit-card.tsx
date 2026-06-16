@@ -24,7 +24,7 @@ interface ProduitStructure {
   restant_a_faire: number | null;
   compagnies_cibles: string | null;
   commentaire: string | null;
-  active: boolean;
+  active: boolean | null;
 }
 
 export function ProduitCard({ produit }: { produit: ProduitStructure }) {

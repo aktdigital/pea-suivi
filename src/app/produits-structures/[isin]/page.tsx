@@ -8,7 +8,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import type { Client, Conseiller } from "@/lib/types";
 import { OperationFormButton } from "@/components/operations/operation-form";
-import { IsinOperationsTable } from "@/components/produits-structures/isin-operations-table";
+import { IsinOperationsTable, type IsinOperation } from "@/components/produits-structures/isin-operations-table";
 
 interface PageProps {
   params: Promise<{ isin: string }>;
@@ -55,12 +55,12 @@ export default async function ProduitDetailPage({ params }: PageProps) {
   ] = await Promise.all([
     supabase
       .from("produits_structures")
-      .select("*")
+      .select("isin, nom_produit, sous_jacent, mecanisme, duree, frequence_rappel, protection_gain, protection_capital, degressivite, objectif_rendement, eligible_contrats, upfront_brut, date_fin_commercialisation, enveloppe_reservee, montant_fait, restant_a_faire, compagnies_cibles, commentaire, active, structureur, total_new_cash, total_encours, ca_up_front, mois_creation, date_facturation, statut_facturation")
       .eq("isin", decodedIsin)
       .single(),
     supabase
       .from("operations")
-      .select("*, clients(id, nom, prenom)")
+      .select("id, date, type_operation, montant, collecte_type, conseiller_code, statut, compagnie, contrat, produit, isin, client_id, commentaire, clients(id, nom, prenom)")
       .eq("isin", decodedIsin)
       .order("date", { ascending: false }),
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
@@ -243,7 +243,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
         <div className="space-y-3">
           <h2 className="text-lg font-serif font-semibold text-pea-blue">Détail investisseurs</h2>
           <IsinOperationsTable
-            operations={operations ?? []}
+            operations={(operations ?? []) as IsinOperation[]}
             totalMontant={totalMontant}
             totalNewCash={totalNewCash}
             totalEncours={totalEncours}

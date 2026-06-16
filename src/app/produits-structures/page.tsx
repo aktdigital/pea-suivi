@@ -24,7 +24,7 @@ export default async function ProduitsStructuresPage({ searchParams }: PageProps
 
   let query = supabase
     .from("produits_structures")
-    .select("*")
+    .select("isin, nom_produit, sous_jacent, mecanisme, duree, frequence_rappel, protection_gain, protection_capital, degressivite, objectif_rendement, eligible_contrats, upfront_brut, date_fin_commercialisation, enveloppe_reservee, montant_fait, restant_a_faire, compagnies_cibles, commentaire, active, structureur, total_new_cash, total_encours, ca_up_front, mois_creation")
     .eq("active", true)
     .order("nom_produit");
 

@@ -10,7 +10,7 @@ interface OpClient {
   prenom: string | null;
 }
 
-interface IsinOperation {
+export interface IsinOperation {
   id: string;
   date: string;
   client_id: string | null;

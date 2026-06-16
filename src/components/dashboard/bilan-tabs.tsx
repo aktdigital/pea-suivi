@@ -12,9 +12,7 @@ import {
 } from "@/components/ui/select";
 import { getISOWeek, startOfISOWeek, endOfISOWeek, addWeeks, format } from "date-fns";
 import { fr } from "date-fns/locale";
-
-const CAMILLE_ID = "ca455682-9567-4132-b5bd-4e18cd99cf01";
-const MYRIAM_ID = "0f1117f0-b185-4d16-ba2e-2a8bc578e14b";
+import { CAMILLE_ID, MYRIAM_ID } from "@/lib/constants";
 
 const TYPE_OP_MAP: Record<string, string> = {
   SOUSCRIPTION: "Souscriptions",

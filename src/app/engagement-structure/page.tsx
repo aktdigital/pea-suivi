@@ -4,12 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/utils";
 import { TrendingUp, Banknote, DollarSign, ArrowUpRight } from "lucide-react";
 import { EngagementTable } from "@/components/engagement-structure/engagement-table";
+import type { ProduitStructure } from "@/lib/types";
 
 export default async function EngagementStructurePage() {
   const supabase = await createClient();
 
   const [{ data: produits, error }, { data: refCompagnies }] = await Promise.all([
-    supabase.from("produits_structures").select("*").eq("active", true),
+    supabase.from("produits_structures").select(
+      "isin, nom_produit, sous_jacent, mecanisme, duree, frequence_rappel, protection_gain, protection_capital, degressivite, objectif_rendement, eligible_contrats, upfront_brut, date_fin_commercialisation, enveloppe_reservee, montant_fait, restant_a_faire, total_new_cash, total_encours, ca_up_front, compagnies_cibles, commentaire, structureur, mois_creation, date_facturation, statut_facturation, active"
+    ).eq("active", true),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("label"),
   ]);
 
@@ -23,7 +26,8 @@ export default async function EngagementStructurePage() {
     );
   }
 
-  const all = produits ?? [];
+  // Cast DB rows: active is boolean | null in DB but boolean in app type
+  const all = (produits ?? []) as ProduitStructure[];
 
   // KPIs
   const totalEnveloppe = all.reduce((acc, p) => acc + (p.enveloppe_reservee ?? 0), 0);
