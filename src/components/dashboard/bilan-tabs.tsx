@@ -191,12 +191,14 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
     const rows: PeopleRow[] = [];
     let colorIdx = 0;
 
-    // Utilisateurs cochés
+    // Utilisateurs cochés : ops qu'il a saisies (created_by) OU dont il est
+    // l'assistante rattachée (assistante_id). Indispensable car l'historique
+    // importé n'a pas de created_by ; l'activité réelle est portée par assistante_id.
     for (const uid of selectedUsers) {
       rows.push({
         key: `user_${uid}`,
         label: profileName(uid),
-        predicate: (op) => op.created_by === uid,
+        predicate: (op) => op.created_by === uid || op.assistante_id === uid,
         colorIdx: colorIdx++,
       });
     }
@@ -542,6 +544,12 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
               </div>
             </div>
           </div>
+          <p className="text-[11px] text-pea-gray mt-3 leading-snug">
+            <strong>Utilisateur</strong> = opérations qu&apos;il a saisies <em>ou</em> dont il est l&apos;assistante rattachée.{" "}
+            <strong>Conseiller</strong> = toutes les opérations de ses clients, sous-ventilées par assistante. Une opération
+            n&apos;est jamais comptée deux fois : si elle correspond à la fois à un utilisateur et à un conseiller
+            sélectionnés, elle est portée par la ligne de l&apos;utilisateur.
+          </p>
         </div>
       )}
 
