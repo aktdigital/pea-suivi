@@ -1,13 +1,9 @@
 import AppShell from "@/components/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency, formatDate, MOIS } from "@/lib/utils";
-import { ListChecks, Banknote, Layers } from "lucide-react";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import { MOIS } from "@/lib/utils";
 import { BilanHebdoTabs } from "@/components/dashboard/bilan-tabs";
 import { ActiviteFilters } from "@/components/dashboard/activite-filters";
-import { CAMILLE_ID, MYRIAM_ID } from "@/lib/constants";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -15,86 +11,29 @@ export default async function DashboardPage() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
-  const monthStr = String(month).padStart(2, "0");
-  const lastDay = new Date(year, month, 0).getDate();
-  const moisDebut = `${year}-${monthStr}-01`;
-  const moisFin = `${year}-${monthStr}-${lastDay}`;
-  const todayStr = now.toISOString().split("T")[0];
 
-  // Jan–Avril 2026 pour les bilan tabs + activité filters
-  const extStart = "2026-01-01";
-  const extEnd = "2026-04-30";
-
+  // Toutes les opérations 2026 (mutualisé pour BilanHebdoTabs + ActiviteFilters)
   const [
-    { data: opsMois },
-    { data: produitsActifs },
-    { data: dernieresOps },
+    { data: ops2026Raw },
     { data: profiles },
-    { data: opsBilanCamilleMyriamRaw },
-    { data: opsActiviteRaw },
+    { data: conseillers },
   ] = await Promise.all([
     supabase
       .from("operations")
-      .select("montant, collecte_type, conseiller_code, created_by, assistante_id")
-      .gte("date", moisDebut)
-      .lte("date", moisFin),
-    supabase
-      .from("produits_structures")
-      .select("isin")
-      .eq("active", true)
-      .gte("date_fin_commercialisation", todayStr),
-    supabase
-      .from("operations")
-      .select(`
-        id, date, type_operation, montant, statut, client_id, conseiller_code,
-        clients(nom, prenom),
-        created_by_profile:profiles!operations_created_by_fkey(id, full_name)
-      `)
-      .order("created_at", { ascending: false })
-      .limit(5),
+      .select("date, type_operation, montant, collecte_type, conseiller_code, created_by, assistante_id")
+      .gte("date", "2026-01-01")
+      .lte("date", "2026-12-31"),
     supabase
       .from("profiles")
       .select("id, full_name, email, role"),
-    // Opérations Camille & Myriam Jan-Avril 2026 (pour BilanHebdoTabs)
     supabase
-      .from("operations")
-      .select("date, type_operation, assistante_id")
-      .in("assistante_id", [CAMILLE_ID, MYRIAM_ID])
-      .gte("date", extStart)
-      .lte("date", extEnd),
-    // Toutes ops Jan-Avril 2026 (pour ActiviteFilters)
-    supabase
-      .from("operations")
-      .select("date, montant, collecte_type, conseiller_code, created_by, assistante_id")
-      .gte("date", extStart)
-      .lte("date", extEnd),
+      .from("conseillers")
+      .select("code, full_name")
+      .eq("active", true)
+      .order("code"),
   ]);
 
-  const totalNewCash =
-    opsMois
-      ?.filter((op) => op.collecte_type === "new_cash")
-      .reduce((acc, op) => acc + (op.montant ?? 0), 0) ?? 0;
-
-  const kpis = [
-    {
-      label: `Opérations — ${MOIS[month - 1]}`,
-      value: opsMois?.length ?? 0,
-      icon: ListChecks,
-      suffix: "",
-    },
-    {
-      label: "Volume New Cash",
-      value: formatCurrency(totalNewCash),
-      icon: Banknote,
-      suffix: "",
-    },
-    {
-      label: "Produits structurés actifs",
-      value: (produitsActifs ?? []).length,
-      icon: Layers,
-      suffix: "",
-    },
-  ];
+  const ops2026 = ops2026Raw ?? [];
 
   return (
     <AppShell>
@@ -106,102 +45,23 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* KPI cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {kpis.map((k) => (
-            <Card key={k.label} className="border-pea-gray/30 bg-white">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-6 pt-6">
-                <CardTitle className="text-xs font-medium text-pea-gray uppercase tracking-wide">{k.label}</CardTitle>
-                <k.icon className="size-4 text-pea-teal" />
-              </CardHeader>
-              <CardContent className="px-6 pb-6">
-                <div className="text-3xl font-serif font-semibold text-pea-blue">{k.value}</div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Bilan Camille & Myriam — vue mensuelle / hebdomadaire */}
+        {/* Bilan hebdomadaire filtrable */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Bilan hebdomadaire — Camille &amp; Myriam (T1 2026)</CardTitle>
+            <CardTitle className="text-base">Bilan hebdomadaire</CardTitle>
           </CardHeader>
-          <BilanHebdoTabs operations={opsBilanCamilleMyriamRaw ?? []} />
+          <BilanHebdoTabs
+            operations={ops2026}
+            profiles={profiles ?? []}
+            conseillers={conseillers ?? []}
+          />
         </Card>
 
         {/* Activité par assistante & conseiller avec filtre mois */}
         <ActiviteFilters
-          operations={opsActiviteRaw ?? []}
+          operations={ops2026}
           profiles={profiles ?? []}
         />
-
-        {/* 5 dernières opérations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">5 dernières opérations</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {(dernieresOps ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 pb-4">Aucune opération.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Client</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Type</th>
-                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Montant</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Conseiller</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Par</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(dernieresOps ?? []).map((op, i) => {
-                    const rawClient = op.clients;
-                    const clientData = Array.isArray(rawClient)
-                      ? (rawClient[0] as { nom: string; prenom: string | null } | undefined) ?? null
-                      : (rawClient as { nom: string; prenom: string | null } | null);
-                    const rawCreator = op.created_by_profile;
-                    const creatorName = Array.isArray(rawCreator)
-                      ? (rawCreator[0] as { full_name: string | null } | undefined)?.full_name ?? null
-                      : (rawCreator as { full_name: string | null } | null)?.full_name ?? null;
-                    return (
-                      <tr key={op.id} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
-                        <td className="px-4 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          {clientData && op.client_id ? (
-                            <Link
-                              href={`/clients/${op.client_id}`}
-                              className="hover:underline hover:text-pea-teal transition-colors"
-                            >
-                              {`${clientData.nom} ${clientData.prenom ?? ""}`.trim()}
-                            </Link>
-                          ) : clientData ? (
-                            `${clientData.nom} ${clientData.prenom ?? ""}`.trim()
-                          ) : "—"}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
-                        <td className="px-4 py-2 text-right whitespace-nowrap font-medium">
-                          {formatCurrency(op.montant)}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">{op.conseiller_code ?? "—"}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-muted-foreground text-xs">
-                          {creatorName ?? "—"}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          {op.statut ? (
-                            <Badge variant="outline">{op.statut}</Badge>
-                          ) : "—"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </AppShell>
   );

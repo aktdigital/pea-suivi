@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectTrigger,
@@ -10,9 +11,55 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { getISOWeek, startOfISOWeek, endOfISOWeek, addWeeks, format } from "date-fns";
+import {
+  getISOWeek,
+  startOfISOWeek,
+  endOfISOWeek,
+  addWeeks,
+  format,
+} from "date-fns";
 import { fr } from "date-fns/locale";
+import { SlidersHorizontal, Download, ChevronDown, ChevronUp } from "lucide-react";
 import { CAMILLE_ID, MYRIAM_ID } from "@/lib/constants";
+import { serializeCsv } from "@/lib/csv";
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+interface Op {
+  date: string;
+  type_operation: string | null;
+  created_by: string | null;
+  assistante_id: string | null;
+  conseiller_code: string | null;
+}
+
+interface Profile {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string | null;
+}
+
+interface Conseiller {
+  code: string;
+  full_name: string;
+}
+
+interface PeopleRow {
+  key: string;
+  label: string;
+  predicate: (op: Op) => boolean;
+  /** Couleur de badge : indice dans BADGE_COLORS */
+  colorIdx: number;
+}
+
+export interface BilanHebdoTabsProps {
+  operations: Op[];
+  profiles: Profile[];
+  conseillers: Conseiller[];
+}
+
+// ── Constantes ─────────────────────────────────────────────────────────────────
 
 const TYPE_OP_MAP: Record<string, string> = {
   SOUSCRIPTION: "Souscriptions",
@@ -29,23 +76,30 @@ const OP_LABELS_ORDER = [
   "Rachats",
   "Arbitrages",
   "Passages d'ordre",
+  "Autres",
 ];
 
-const T1_MOIS = [1, 2, 3];
-const MOIS_LABELS = ["Janvier", "Février", "Mars"];
+const MOIS_LABELS = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+];
 
-interface Op {
-  date: string;
-  type_operation: string | null;
-  assistante_id: string | null;
-}
+const BADGE_COLORS = [
+  "bg-pea-teal/15 text-pea-teal",
+  "bg-pea-gold/20 text-[#7a5530]",
+  "bg-purple-100 text-purple-700",
+  "bg-pink-100 text-pink-700",
+  "bg-blue-100 text-blue-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-orange-100 text-orange-700",
+  "bg-indigo-100 text-indigo-700",
+];
 
-// Generate ISO weeks for 2026 (S1 to S15)
-function generateISOWeeks2026(maxWeek = 15) {
+// ── Semaines ISO 2026 ──────────────────────────────────────────────────────────
+
+function generateISOWeeks2026(maxWeek = 52) {
   const weeks: { label: string; weekNumber: number; start: Date; end: Date }[] = [];
-  // ISO week 1 of 2026: find the first ISO week that belongs to 2026
-  // Start from 2025-12-29 (which is Monday of W1 2026)
-  const w1Start = startOfISOWeek(new Date(2026, 0, 4)); // Jan 4 is always in W1
+  const w1Start = startOfISOWeek(new Date(2026, 0, 4)); // Jan 4 toujours en S1
   for (let w = 1; w <= maxWeek; w++) {
     const start = addWeeks(w1Start, w - 1);
     const end = endOfISOWeek(start);
@@ -61,302 +115,677 @@ function generateISOWeeks2026(maxWeek = 15) {
   return weeks;
 }
 
-const ISO_WEEKS = generateISOWeeks2026(15);
+const ISO_WEEKS = generateISOWeeks2026(52);
 
-export function BilanHebdoTabs({ operations }: { operations: Op[] }) {
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function mapTypeOp(typeOp: string | null): string {
+  const raw = (typeOp ?? "").toUpperCase().trim();
+  return TYPE_OP_MAP[raw] ?? "Autres";
+}
+
+function getISOWeek2026(dateStr: string): number | null {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  if (d.getFullYear() < 2025 || d.getFullYear() > 2027) return null;
+  return getISOWeek(d);
+}
+
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function downloadCsv(csvStr: string, filename: string) {
+  const blob = new Blob([csvStr], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Badge coloré ───────────────────────────────────────────────────────────────
+
+function ColorBadge({ n, colorIdx }: { n: number; colorIdx: number }) {
+  const cls = BADGE_COLORS[colorIdx % BADGE_COLORS.length];
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}>
+      {n}
+    </span>
+  );
+}
+
+// ── Composant principal ────────────────────────────────────────────────────────
+
+export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdoTabsProps) {
+  // ── État du filtre ──────────────────────────────────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(
+    new Set([CAMILLE_ID, MYRIAM_ID])
+  );
+  const [selectedConseillers, setSelectedConseillers] = useState<Set<string>>(
+    new Set()
+  );
+
+  // ── État semaine ────────────────────────────────────────────────────────────
   const [selectedWeek, setSelectedWeek] = useState<string>(
     ISO_WEEKS[0].weekNumber.toString()
   );
+  const [activeTab, setActiveTab] = useState<string>("mensuel");
 
-  // ── Vue mensuelle ──────────────────────────────────────────────────────────
-  const monthlyMatrix = OP_LABELS_ORDER.map((label) => {
-    const data: Record<string, number> = {};
-    for (const op of operations) {
-      const d = new Date(op.date);
-      const m = d.getMonth() + 1;
-      if (!T1_MOIS.includes(m)) continue;
-      const rawLabel = (op.type_operation ?? "").toUpperCase().trim();
-      const mappedLabel = TYPE_OP_MAP[rawLabel];
-      if (mappedLabel !== label) continue;
-      const isC = op.assistante_id === CAMILLE_ID;
-      const key = `${m}_${isC ? "C" : "M"}`;
-      data[key] = (data[key] ?? 0) + 1;
+  // ── Lookup profiles ─────────────────────────────────────────────────────────
+  const profileById = useMemo(() => {
+    const m = new Map<string, Profile>();
+    for (const p of profiles) m.set(p.id, p);
+    return m;
+  }, [profiles]);
+
+  function profileName(id: string): string {
+    const p = profileById.get(id);
+    return p?.full_name ?? p?.email ?? id;
+  }
+
+  // ── People rows ─────────────────────────────────────────────────────────────
+  const peopleRows = useMemo((): PeopleRow[] => {
+    const rows: PeopleRow[] = [];
+    let colorIdx = 0;
+
+    // Utilisateurs cochés
+    for (const uid of selectedUsers) {
+      rows.push({
+        key: `user_${uid}`,
+        label: profileName(uid),
+        predicate: (op) => op.created_by === uid,
+        colorIdx: colorIdx++,
+      });
     }
-    let totalC = 0;
-    let totalM = 0;
-    for (const m of T1_MOIS) {
-      totalC += data[`${m}_C`] ?? 0;
-      totalM += data[`${m}_M`] ?? 0;
-    }
-    return { label, data, totalC, totalM };
-  });
 
-  const monthGrandTotals = T1_MOIS.map((m) => ({
-    m,
-    c: monthlyMatrix.reduce((acc, r) => acc + (r.data[`${m}_C`] ?? 0), 0),
-    mv: monthlyMatrix.reduce((acc, r) => acc + (r.data[`${m}_M`] ?? 0), 0),
-  }));
+    // Conseillers cochés → sous-ventilation par assistante
+    for (const code of selectedConseillers) {
+      // Assistantes distinctes dans les ops de ce conseiller
+      const assistanteIds = Array.from(
+        new Set(
+          operations
+            .filter((op) => op.conseiller_code === code && op.assistante_id != null)
+            .map((op) => op.assistante_id as string)
+        )
+      ).sort();
 
-  const grandTotalC = monthlyMatrix.reduce((acc, r) => acc + r.totalC, 0);
-  const grandTotalM = monthlyMatrix.reduce((acc, r) => acc + r.totalM, 0);
-
-  // ── Vue hebdomadaire ───────────────────────────────────────────────────────
-  const weekNum = parseInt(selectedWeek, 10);
-  const selectedWeekInfo = ISO_WEEKS.find((w) => w.weekNumber === weekNum);
-
-  const weeklyMatrix = OP_LABELS_ORDER.map((label) => {
-    let c = 0;
-    let mv = 0;
-    if (selectedWeekInfo) {
-      for (const op of operations) {
-        const d = new Date(op.date);
-        const isoWeek = getISOWeek(d);
-        const isoYear = d >= new Date(2026, 0, 1) && d <= new Date(2026, 11, 31) ? 2026 : d.getFullYear();
-        if (isoYear !== 2026 || isoWeek !== weekNum) continue;
-        const rawLabel = (op.type_operation ?? "").toUpperCase().trim();
-        const mappedLabel = TYPE_OP_MAP[rawLabel];
-        if (mappedLabel !== label) continue;
-        if (op.assistante_id === CAMILLE_ID) c++;
-        else if (op.assistante_id === MYRIAM_ID) mv++;
+      for (const assistanteId of assistanteIds) {
+        rows.push({
+          key: `conseiller_${code}_${assistanteId}`,
+          label: `${code} · ${profileName(assistanteId)}`,
+          predicate: (op) =>
+            op.conseiller_code === code && op.assistante_id === assistanteId,
+          colorIdx: colorIdx++,
+        });
       }
     }
-    return { label, c, mv, total: c + mv };
-  });
 
-  const weekGrandC = weeklyMatrix.reduce((acc, r) => acc + r.c, 0);
-  const weekGrandM = weeklyMatrix.reduce((acc, r) => acc + r.mv, 0);
-  const weekGrandTotal = weekGrandC + weekGrandM;
+    return rows;
+  }, [selectedUsers, selectedConseillers, operations, profileById]);
 
-  const cellC = (n: number) => (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-teal/15 text-pea-teal">
-      {n}
-    </span>
-  );
-  const cellM = (n: number) => (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-pea-gold/20 text-[#7a5530]">
-      {n}
-    </span>
-  );
+  // ── Ensemble des ops considérées ────────────────────────────────────────────
+  const activeOps = useMemo(() => {
+    if (peopleRows.length === 0) return operations;
+    return operations.filter((op) => peopleRows.some((r) => r.predicate(op)));
+  }, [operations, peopleRows]);
 
+  // ── Compteur de sélection ───────────────────────────────────────────────────
+  const selectionCount = selectedUsers.size + selectedConseillers.size;
+
+  function clearAll() {
+    setSelectedUsers(new Set());
+    setSelectedConseillers(new Set());
+  }
+
+  function toggleUser(id: string) {
+    setSelectedUsers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleConseiller(code: string) {
+    setSelectedConseillers((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }
+
+  // ── Vue mensuelle ───────────────────────────────────────────────────────────
+  const monthlyMatrix = useMemo(() =>
+    OP_LABELS_ORDER.map((label) => {
+      // Compte par mois+peopleRow
+      const counts: Record<string, number> = {}; // key = `${m}_${rowKey}`
+      for (const op of activeOps) {
+        const mapped = mapTypeOp(op.type_operation);
+        if (mapped !== label) continue;
+        const d = new Date(op.date);
+        const m = d.getMonth() + 1;
+        if (m < 1 || m > 12) continue;
+        for (const row of peopleRows) {
+          if (row.predicate(op)) {
+            const k = `${m}_${row.key}`;
+            counts[k] = (counts[k] ?? 0) + 1;
+            break; // une op ne peut matcher qu'une seule people row
+          }
+        }
+        // si aucune people row → toutes ops (mode rien coché)
+        if (peopleRows.length === 0) {
+          const k = `${m}__all`;
+          counts[k] = (counts[k] ?? 0) + 1;
+        }
+      }
+      // Total par mois (toutes people rows)
+      const monthTotals: Record<number, number> = {};
+      for (let m = 1; m <= 12; m++) {
+        if (peopleRows.length === 0) {
+          monthTotals[m] = counts[`${m}__all`] ?? 0;
+        } else {
+          monthTotals[m] = peopleRows.reduce(
+            (acc, r) => acc + (counts[`${m}_${r.key}`] ?? 0),
+            0
+          );
+        }
+      }
+      const rowTotal = Object.values(monthTotals).reduce((a, b) => a + b, 0);
+      return { label, counts, monthTotals, rowTotal };
+    }),
+  [activeOps, peopleRows]);
+
+  // Totaux de colonne (TOTAL par mois)
+  const colTotals = useMemo(() => {
+    const totals: Record<number, number> = {};
+    for (let m = 1; m <= 12; m++) {
+      totals[m] = monthlyMatrix.reduce((acc, r) => acc + (r.monthTotals[m] ?? 0), 0);
+    }
+    return totals;
+  }, [monthlyMatrix]);
+
+  const grandTotal = Object.values(colTotals).reduce((a, b) => a + b, 0);
+
+  // Totaux TOTAL par people row par mois
+  const colPeopleRowTotals = useMemo(() => {
+    if (peopleRows.length === 0) return {};
+    const map: Record<string, Record<number, number>> = {};
+    for (const row of peopleRows) {
+      map[row.key] = {};
+      for (let m = 1; m <= 12; m++) {
+        map[row.key][m] = monthlyMatrix.reduce(
+          (acc, r) => acc + (r.counts[`${m}_${row.key}`] ?? 0),
+          0
+        );
+      }
+    }
+    return map;
+  }, [monthlyMatrix, peopleRows]);
+
+  // ── Vue hebdomadaire ────────────────────────────────────────────────────────
+  const weekNum = parseInt(selectedWeek, 10);
+
+  const weeklyMatrix = useMemo(() =>
+    OP_LABELS_ORDER.map((label) => {
+      const counts: Record<string, number> = {}; // key = rowKey (or '__all')
+      let total = 0;
+      for (const op of activeOps) {
+        const mapped = mapTypeOp(op.type_operation);
+        if (mapped !== label) continue;
+        const isoWeek = getISOWeek2026(op.date);
+        if (isoWeek !== weekNum) continue;
+        if (peopleRows.length === 0) {
+          counts["__all"] = (counts["__all"] ?? 0) + 1;
+          total++;
+        } else {
+          for (const row of peopleRows) {
+            if (row.predicate(op)) {
+              counts[row.key] = (counts[row.key] ?? 0) + 1;
+              total++;
+              break;
+            }
+          }
+        }
+      }
+      return { label, counts, total };
+    }),
+  [activeOps, peopleRows, weekNum]);
+
+  const weekColTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const row of peopleRows) {
+      totals[row.key] = weeklyMatrix.reduce((acc, r) => acc + (r.counts[row.key] ?? 0), 0);
+    }
+    if (peopleRows.length === 0) {
+      totals["__all"] = weeklyMatrix.reduce((acc, r) => acc + (r.counts["__all"] ?? 0), 0);
+    }
+    return totals;
+  }, [weeklyMatrix, peopleRows]);
+
+  const weekGrandTotal = weeklyMatrix.reduce((acc, r) => acc + r.total, 0);
+
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  function exportMensuelCsv() {
+    const today = todayStr();
+    const headers = ["Opération", ...MOIS_LABELS, "Total"];
+    const rows: string[][] = [];
+
+    for (const row of monthlyMatrix) {
+      // Ligne principale
+      rows.push([
+        row.label,
+        ...Array.from({ length: 12 }, (_, i) => String(row.monthTotals[i + 1] ?? 0)),
+        String(row.rowTotal),
+      ]);
+      // Sous-lignes people rows
+      for (const pr of peopleRows) {
+        rows.push([
+          `└ ${pr.label}`,
+          ...Array.from({ length: 12 }, (_, i) =>
+            String(row.counts[`${i + 1}_${pr.key}`] ?? 0)
+          ),
+          String(
+            Array.from({ length: 12 }, (_, i) => row.counts[`${i + 1}_${pr.key}`] ?? 0).reduce(
+              (a, b) => a + b, 0
+            )
+          ),
+        ]);
+      }
+    }
+
+    // Ligne TOTAL
+    rows.push([
+      "TOTAL",
+      ...Array.from({ length: 12 }, (_, i) => String(colTotals[i + 1] ?? 0)),
+      String(grandTotal),
+    ]);
+    for (const pr of peopleRows) {
+      rows.push([
+        `└ ${pr.label}`,
+        ...Array.from({ length: 12 }, (_, i) =>
+          String(colPeopleRowTotals[pr.key]?.[i + 1] ?? 0)
+        ),
+        String(
+          Object.values(colPeopleRowTotals[pr.key] ?? {}).reduce((a: number, b: number) => a + b, 0)
+        ),
+      ]);
+    }
+
+    const csv = serializeCsv(headers, rows);
+    downloadCsv(csv, `bilan_mensuel_${today}.csv`);
+  }
+
+  function exportHedboCsv() {
+    const today = todayStr();
+    const headers = [
+      "Opération",
+      ...(peopleRows.length === 0 ? ["Tous"] : peopleRows.map((r) => r.label)),
+      "Total",
+    ];
+    const rows: string[][] = [];
+
+    for (const row of weeklyMatrix) {
+      rows.push([
+        row.label,
+        ...(peopleRows.length === 0
+          ? [String(row.counts["__all"] ?? 0)]
+          : peopleRows.map((pr) => String(row.counts[pr.key] ?? 0))),
+        String(row.total),
+      ]);
+    }
+    // TOTAL
+    rows.push([
+      "TOTAL",
+      ...(peopleRows.length === 0
+        ? [String(weekColTotals["__all"] ?? 0)]
+        : peopleRows.map((pr) => String(weekColTotals[pr.key] ?? 0))),
+      String(weekGrandTotal),
+    ]);
+
+    const csv = serializeCsv(headers, rows);
+    downloadCsv(csv, `bilan_hebdo_S${weekNum}_${today}.csv`);
+  }
+
+  // ── Classes partagées ───────────────────────────────────────────────────────
+  const btnOutline =
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors h-8 px-3 py-1.5 border border-pea-gray/40 bg-pea-cream text-pea-blue hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&_svg]:size-4 [&_svg]:shrink-0";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <Tabs defaultValue="mensuel" className="w-full">
-      <div className="px-4 pt-2 pb-0">
-        <TabsList className="mb-3">
-          <TabsTrigger value="mensuel">Vue mensuelle</TabsTrigger>
-          <TabsTrigger value="hebdo">Vue hebdomadaire</TabsTrigger>
-        </TabsList>
+    <div className="w-full">
+      {/* Barre d'outils : filtrer + export */}
+      <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFilterOpen((v) => !v)}
+            className={btnOutline}
+          >
+            <SlidersHorizontal />
+            Filtrer
+            {selectionCount > 0 && (
+              <span className="ml-1 inline-flex items-center justify-center rounded-full bg-pea-teal text-white text-[10px] font-bold w-4 h-4">
+                {selectionCount}
+              </span>
+            )}
+            {filterOpen ? <ChevronUp className="ml-1" /> : <ChevronDown className="ml-1" />}
+          </button>
+          {selectionCount === 0 && (
+            <span className="text-xs text-pea-gray italic">Toutes les ops</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={activeTab === "mensuel" ? exportMensuelCsv : exportHedboCsv}
+          className={btnOutline}
+        >
+          <Download />
+          Télécharger CSV
+        </button>
       </div>
 
-      {/* ── Onglet mensuel ── */}
-      <TabsContent value="mensuel">
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-pea-blue/5">
-                <th className="text-left px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
-                  Opération
-                </th>
-                {T1_MOIS.map((m, i) => (
-                  <th
-                    key={m}
-                    className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap"
-                  >
-                    {MOIS_LABELS[i]}
-                  </th>
-                ))}
-                <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
-                  Total T1
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthlyMatrix.map((row, i) => {
-                const totalRow = row.totalC + row.totalM;
-                return (
-                  <React.Fragment key={row.label}>
-                    {/* Ligne principale */}
-                    <tr
-                      className={`border-b ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
-                    >
-                      <td className="px-4 py-1.5 whitespace-nowrap font-semibold text-pea-graphite">
-                        {row.label}
-                      </td>
-                      {T1_MOIS.map((m) => {
-                        const c = row.data[`${m}_C`] ?? 0;
-                        const mv = row.data[`${m}_M`] ?? 0;
-                        return (
-                          <td
-                            key={m}
-                            className="px-4 py-1.5 text-center whitespace-nowrap font-semibold text-pea-teal"
-                          >
-                            {c + mv}
-                          </td>
-                        );
-                      })}
-                      <td className="px-4 py-1.5 text-center whitespace-nowrap font-bold text-pea-teal">
-                        {totalRow}
-                      </td>
-                    </tr>
-                    {/* Sous-ligne Camille */}
-                    <tr className={i % 2 === 0 ? "bg-white" : "bg-pea-cream"}>
-                      <td className="px-4 py-1 pl-8 whitespace-nowrap text-xs text-pea-gray">
-                        └ Camille
-                      </td>
-                      {T1_MOIS.map((m) => (
-                        <td
-                          key={m}
-                          className="px-4 py-1 text-center whitespace-nowrap"
-                        >
-                          {cellC(row.data[`${m}_C`] ?? 0)}
-                        </td>
-                      ))}
-                      <td className="px-4 py-1 text-center whitespace-nowrap">
-                        {cellC(row.totalC)}
-                      </td>
-                    </tr>
-                    {/* Sous-ligne Myriam */}
-                    <tr
-                      className={`border-b ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
-                    >
-                      <td className="px-4 py-1 pl-8 whitespace-nowrap text-xs text-pea-gray">
-                        └ Myriam
-                      </td>
-                      {T1_MOIS.map((m) => (
-                        <td
-                          key={m}
-                          className="px-4 py-1 text-center whitespace-nowrap"
-                        >
-                          {cellM(row.data[`${m}_M`] ?? 0)}
-                        </td>
-                      ))}
-                      <td className="px-4 py-1 text-center whitespace-nowrap">
-                        {cellM(row.totalM)}
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                );
-              })}
-              {/* Ligne TOTAL */}
-              <tr className="border-t-2 font-bold bg-pea-blue/5">
-                <td className="px-4 py-2 whitespace-nowrap text-pea-blue uppercase text-xs tracking-wide">
-                  TOTAL
-                </td>
-                {monthGrandTotals.map(({ m, c, mv }) => (
-                  <td
-                    key={m}
-                    className="px-4 py-2 text-center whitespace-nowrap font-bold text-pea-graphite"
-                  >
-                    {c + mv}
-                  </td>
-                ))}
-                <td className="px-4 py-2 text-center whitespace-nowrap font-bold text-pea-graphite">
-                  {grandTotalC + grandTotalM}
-                </td>
-              </tr>
-              {/* Sous-ligne Camille total */}
-              <tr className="bg-pea-blue/5">
-                <td className="px-4 py-1 pl-8 whitespace-nowrap text-xs text-pea-gray">
-                  └ Camille
-                </td>
-                {monthGrandTotals.map(({ m, c }) => (
-                  <td key={m} className="px-4 py-1 text-center whitespace-nowrap">
-                    {cellC(c)}
-                  </td>
-                ))}
-                <td className="px-4 py-1 text-center whitespace-nowrap">
-                  {cellC(grandTotalC)}
-                </td>
-              </tr>
-              {/* Sous-ligne Myriam total */}
-              <tr className="bg-pea-blue/5 border-b">
-                <td className="px-4 py-1 pl-8 whitespace-nowrap text-xs text-pea-gray">
-                  └ Myriam
-                </td>
-                {monthGrandTotals.map(({ m, mv }) => (
-                  <td key={m} className="px-4 py-1 text-center whitespace-nowrap">
-                    {cellM(mv)}
-                  </td>
-                ))}
-                <td className="px-4 py-1 text-center whitespace-nowrap">
-                  {cellM(grandTotalM)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </CardContent>
-      </TabsContent>
-
-      {/* ── Onglet hebdomadaire ── */}
-      <TabsContent value="hebdo">
-        <CardContent className="p-0">
-          <div className="px-4 py-3">
-            <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-              <SelectTrigger className="w-72">
-                <SelectValue placeholder="Choisir une semaine..." />
-              </SelectTrigger>
-              <SelectContent>
-                {ISO_WEEKS.map((w) => (
-                  <SelectItem key={w.weekNumber} value={w.weekNumber.toString()}>
-                    {w.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Volet de filtre repliable */}
+      {filterOpen && (
+        <div className="mx-4 mb-3 rounded-lg border border-pea-gray/30 bg-pea-cream p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-pea-blue uppercase tracking-wide">
+              Filtres
+            </span>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="text-xs text-pea-gray underline hover:text-pea-blue transition-colors"
+            >
+              Tout décocher
+            </button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Groupe Utilisateurs */}
+            <div>
+              <p className="text-xs font-medium text-pea-graphite mb-2 uppercase tracking-wide">
+                Utilisateurs
+              </p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {profiles.map((p) => {
+                  const label = p.full_name ?? p.email ?? p.id;
+                  return (
+                    <Checkbox
+                      key={p.id}
+                      id={`user_${p.id}`}
+                      label={label}
+                      checked={selectedUsers.has(p.id)}
+                      onChange={() => toggleUser(p.id)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            {/* Groupe Conseillers */}
+            <div>
+              <p className="text-xs font-medium text-pea-graphite mb-2 uppercase tracking-wide">
+                Conseillers
+              </p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {conseillers.map((c) => (
+                  <Checkbox
+                    key={c.code}
+                    id={`cons_${c.code}`}
+                    label={`${c.full_name} (${c.code})`}
+                    checked={selectedConseillers.has(c.code)}
+                    onChange={() => toggleConseiller(c.code)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Onglets */}
+      <Tabs
+        defaultValue="mensuel"
+        className="w-full"
+        onValueChange={(v) => setActiveTab(v)}
+      >
+        <div className="px-4 pt-1 pb-0">
+          <TabsList className="mb-3">
+            <TabsTrigger value="mensuel">Vue mensuelle</TabsTrigger>
+            <TabsTrigger value="hebdo">Vue hebdomadaire</TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* ── Onglet mensuel ── */}
+        <TabsContent value="mensuel">
+          <CardContent className="p-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-pea-blue/5">
-                  <th className="text-left px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
+                  <th className="text-left px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap sticky left-0 bg-pea-blue/5 z-10">
                     Opération
                   </th>
-                  <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
-                    Camille
-                  </th>
-                  <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
-                    Myriam
-                  </th>
+                  {MOIS_LABELS.map((m) => (
+                    <th
+                      key={m}
+                      className="text-center px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap"
+                    >
+                      {m}
+                    </th>
+                  ))}
                   <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
                     Total
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {weeklyMatrix.map((row, i) => (
+                {monthlyMatrix.map((row, i) => (
+                  <React.Fragment key={row.label}>
+                    {/* Ligne principale */}
+                    <tr className={i % 2 === 0 ? "bg-white" : "bg-pea-cream"}>
+                      <td className={`px-4 py-1.5 whitespace-nowrap font-semibold text-pea-graphite sticky left-0 z-10 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}>
+                        {row.label}
+                      </td>
+                      {Array.from({ length: 12 }, (_, idx) => {
+                        const m = idx + 1;
+                        return (
+                          <td
+                            key={m}
+                            className="px-3 py-1.5 text-center whitespace-nowrap font-semibold text-pea-teal"
+                          >
+                            {row.monthTotals[m] ?? 0}
+                          </td>
+                        );
+                      })}
+                      <td className="px-4 py-1.5 text-center whitespace-nowrap font-bold text-pea-teal">
+                        {row.rowTotal}
+                      </td>
+                    </tr>
+                    {/* Sous-lignes people rows */}
+                    {peopleRows.map((pr, prIdx) => (
+                      <tr
+                        key={pr.key}
+                        className={`${prIdx === peopleRows.length - 1 ? "border-b" : ""} ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
+                      >
+                        <td className={`px-4 py-1 pl-8 whitespace-nowrap text-xs text-pea-gray sticky left-0 z-10 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}>
+                          └ {pr.label}
+                        </td>
+                        {Array.from({ length: 12 }, (_, idx) => {
+                          const m = idx + 1;
+                          return (
+                            <td key={m} className="px-3 py-1 text-center whitespace-nowrap">
+                              <ColorBadge
+                                n={row.counts[`${m}_${pr.key}`] ?? 0}
+                                colorIdx={pr.colorIdx}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-1 text-center whitespace-nowrap">
+                          <ColorBadge
+                            n={Array.from({ length: 12 }, (_, idx) =>
+                              row.counts[`${idx + 1}_${pr.key}`] ?? 0
+                            ).reduce((a, b) => a + b, 0)}
+                            colorIdx={pr.colorIdx}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {/* séparateur si pas de sous-lignes */}
+                    {peopleRows.length === 0 && (
+                      <tr className={`border-b ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}>
+                        <td colSpan={14} className="p-0" />
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+
+                {/* Ligne TOTAL */}
+                <tr className="border-t-2 font-bold bg-pea-blue/5">
+                  <td className="px-4 py-2 whitespace-nowrap text-pea-blue uppercase text-xs tracking-wide sticky left-0 bg-pea-blue/5 z-10">
+                    TOTAL
+                  </td>
+                  {Array.from({ length: 12 }, (_, idx) => (
+                    <td
+                      key={idx}
+                      className="px-3 py-2 text-center whitespace-nowrap font-bold text-pea-graphite"
+                    >
+                      {colTotals[idx + 1] ?? 0}
+                    </td>
+                  ))}
+                  <td className="px-4 py-2 text-center whitespace-nowrap font-bold text-pea-graphite">
+                    {grandTotal}
+                  </td>
+                </tr>
+                {/* Sous-lignes TOTAL par people row */}
+                {peopleRows.map((pr, prIdx) => (
                   <tr
-                    key={row.label}
-                    className={`border-b last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
+                    key={pr.key}
+                    className={`bg-pea-blue/5 ${prIdx === peopleRows.length - 1 ? "border-b" : ""}`}
                   >
-                    <td className="px-4 py-2 whitespace-nowrap text-pea-graphite">
-                      {row.label}
+                    <td className="px-4 py-1 pl-8 whitespace-nowrap text-xs text-pea-gray sticky left-0 bg-pea-blue/5 z-10">
+                      └ {pr.label}
                     </td>
-                    <td className="px-4 py-2 text-center whitespace-nowrap">
-                      {cellC(row.c)}
-                    </td>
-                    <td className="px-4 py-2 text-center whitespace-nowrap">
-                      {cellM(row.mv)}
-                    </td>
-                    <td className="px-4 py-2 text-center whitespace-nowrap font-semibold text-pea-graphite">
-                      {row.total}
+                    {Array.from({ length: 12 }, (_, idx) => (
+                      <td key={idx} className="px-3 py-1 text-center whitespace-nowrap">
+                        <ColorBadge
+                          n={colPeopleRowTotals[pr.key]?.[idx + 1] ?? 0}
+                          colorIdx={pr.colorIdx}
+                        />
+                      </td>
+                    ))}
+                    <td className="px-4 py-1 text-center whitespace-nowrap">
+                      <ColorBadge
+                        n={Object.values(colPeopleRowTotals[pr.key] ?? {}).reduce(
+                          (a: number, b: number) => a + b,
+                          0
+                        )}
+                        colorIdx={pr.colorIdx}
+                      />
                     </td>
                   </tr>
                 ))}
-                {/* Ligne TOTAL */}
-                <tr className="border-t-2 font-bold bg-pea-blue/5">
-                  <td className="px-4 py-2 whitespace-nowrap text-pea-blue uppercase text-xs tracking-wide">
-                    TOTAL
-                  </td>
-                  <td className="px-4 py-2 text-center">{cellC(weekGrandC)}</td>
-                  <td className="px-4 py-2 text-center">{cellM(weekGrandM)}</td>
-                  <td className="px-4 py-2 text-center font-bold text-pea-graphite">
-                    {weekGrandTotal}
-                  </td>
-                </tr>
               </tbody>
             </table>
-          </div>
-        </CardContent>
-      </TabsContent>
-    </Tabs>
+          </CardContent>
+        </TabsContent>
+
+        {/* ── Onglet hebdomadaire ── */}
+        <TabsContent value="hebdo">
+          <CardContent className="p-0">
+            <div className="px-4 py-3">
+              <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                <SelectTrigger className="w-80">
+                  <SelectValue placeholder="Choisir une semaine..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ISO_WEEKS.map((w) => (
+                    <SelectItem key={w.weekNumber} value={w.weekNumber.toString()}>
+                      {w.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-pea-blue/5">
+                    <th className="text-left px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
+                      Opération
+                    </th>
+                    {peopleRows.length === 0 ? (
+                      <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
+                        Tous
+                      </th>
+                    ) : (
+                      peopleRows.map((pr) => (
+                        <th
+                          key={pr.key}
+                          className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap"
+                        >
+                          {pr.label}
+                        </th>
+                      ))
+                    )}
+                    <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeklyMatrix.map((row, i) => (
+                    <tr
+                      key={row.label}
+                      className={`border-b last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
+                    >
+                      <td className="px-4 py-2 whitespace-nowrap text-pea-graphite">
+                        {row.label}
+                      </td>
+                      {peopleRows.length === 0 ? (
+                        <td className="px-4 py-2 text-center whitespace-nowrap font-semibold text-pea-teal">
+                          {row.counts["__all"] ?? 0}
+                        </td>
+                      ) : (
+                        peopleRows.map((pr) => (
+                          <td key={pr.key} className="px-4 py-2 text-center whitespace-nowrap">
+                            <ColorBadge n={row.counts[pr.key] ?? 0} colorIdx={pr.colorIdx} />
+                          </td>
+                        ))
+                      )}
+                      <td className="px-4 py-2 text-center whitespace-nowrap font-semibold text-pea-graphite">
+                        {row.total}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Ligne TOTAL */}
+                  <tr className="border-t-2 font-bold bg-pea-blue/5">
+                    <td className="px-4 py-2 whitespace-nowrap text-pea-blue uppercase text-xs tracking-wide">
+                      TOTAL
+                    </td>
+                    {peopleRows.length === 0 ? (
+                      <td className="px-4 py-2 text-center font-bold text-pea-graphite">
+                        {weekColTotals["__all"] ?? 0}
+                      </td>
+                    ) : (
+                      peopleRows.map((pr) => (
+                        <td key={pr.key} className="px-4 py-2 text-center">
+                          <ColorBadge n={weekColTotals[pr.key] ?? 0} colorIdx={pr.colorIdx} />
+                        </td>
+                      ))
+                    )}
+                    <td className="px-4 py-2 text-center font-bold text-pea-graphite">
+                      {weekGrandTotal}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
