@@ -67,6 +67,7 @@ export interface Operation {
   controle_par_id: string | null;
   controle_at: string | null;
   date_fin: string | null;
+  date_facturation: string | null;
 }
 
 export type StatutControle = "a_faire" | "so" | "en_attente_avenants" | "en_cours_compagnie" | "valide" | "ok";
@@ -130,4 +131,5 @@ export interface ProduitStructure {
   mois_creation: string | null;
   date_facturation: string | null;
   statut_facturation: string | null;
+  date_constatation_initiale: string | null;
 }

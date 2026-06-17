@@ -155,6 +155,16 @@ export function OperationFormInner({
         </div>
 
         <div className="space-y-1">
+          <label className="text-sm font-medium">Date de facturation</label>
+          <input
+            type="date"
+            name="date_facturation"
+            defaultValue={defaultValues?.date_facturation ?? ""}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        <div className="space-y-1">
           <label className="text-sm font-medium">Code ISIN</label>
           <input
             type="text"

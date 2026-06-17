@@ -120,6 +120,10 @@ export function CaracteristiquesFields({
           </select>
         </div>
         <div className="space-y-1">
+          <label className={labelClass}>Date de constatation initiale</label>
+          <input type="date" name="date_constatation_initiale" className={inputClass} />
+        </div>
+        <div className="space-y-1">
           <label className={labelClass}>Fréquence rappel</label>
           <select className={selectClass} value={selectedFrequence} onChange={(e) => onFrequenceChange(e.target.value)}>
             <option value="">— Sélectionner —</option>

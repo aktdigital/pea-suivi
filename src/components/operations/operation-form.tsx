@@ -52,6 +52,7 @@ export function OperationFormButton({
       isin: String(fd.get("isin") || ""),
       validation: fd.get("validation") === "on",
       commentaire: String(fd.get("commentaire") || ""),
+      date_facturation: String(fd.get("date_facturation") || ""),
     };
     const result = await createOperation(data);
     setSaving(false);
@@ -203,6 +204,15 @@ export function OperationFormButton({
                       <option key={p.isin} value={p.isin}>{p.nom_produit}</option>
                     ))}
                   </datalist>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Date de facturation</label>
+                  <input
+                    type="date"
+                    name="date_facturation"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
                 </div>
               </div>
 

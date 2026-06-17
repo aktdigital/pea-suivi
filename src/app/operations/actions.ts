@@ -24,6 +24,7 @@ export type OperationFormData = {
   courrier_pea?: string;
   lettre_mission?: string;
   conformite?: string;
+  date_facturation?: string;
 };
 
 export async function createOperation(formData: OperationFormData) {
@@ -45,6 +46,7 @@ export async function createOperation(formData: OperationFormData) {
     isin: formData.isin || null,
     validation: formData.validation ?? false,
     commentaire: formData.commentaire || null,
+    date_facturation: formData.date_facturation || null,
     created_by: user?.id ?? null,
     assistante_id: user?.id ?? null,
   });
@@ -89,6 +91,7 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     isin: formData.isin || null,
     validation: formData.validation ?? false,
     commentaire: formData.commentaire || null,
+    date_facturation: formData.date_facturation || null,
     updated_at: new Date().toISOString(),
     courrier_pea: formData.courrier_pea !== undefined ? (formData.courrier_pea || "a_faire") : undefined,
     lettre_mission: formData.lettre_mission !== undefined ? (formData.lettre_mission || "a_faire") : undefined,

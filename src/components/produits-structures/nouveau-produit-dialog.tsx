@@ -150,6 +150,7 @@ export function NouveauProduitDialog({
       structureur: selectedStructureur,
       mois_creation: String(fd.get("mois_creation") || ""),
       commentaire: String(fd.get("commentaire") || ""),
+      date_constatation_initiale: String(fd.get("date_constatation_initiale") || ""),
     });
 
     setSaving(false);

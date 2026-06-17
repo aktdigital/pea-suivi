@@ -22,6 +22,7 @@ export interface ProduitStructureFormData {
   structureur?: string;
   mois_creation?: string;
   commentaire?: string;
+  date_constatation_initiale?: string;
 }
 
 export async function createProduitStructure(formData: ProduitStructureFormData) {
@@ -46,6 +47,7 @@ export async function createProduitStructure(formData: ProduitStructureFormData)
     structureur: formData.structureur || null,
     mois_creation: formData.mois_creation || null,
     commentaire: formData.commentaire || null,
+    date_constatation_initiale: formData.date_constatation_initiale || null,
     active: true,
     montant_fait: 0,
     restant_a_faire: formData.enveloppe_reservee ? parseFloat(formData.enveloppe_reservee) : null,

@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -227,6 +229,7 @@ export type Database = {
           created_by: string | null
           date: string
           date_debut: string | null
+          date_facturation: string | null
           date_fin: string | null
           id: string
           isin: string | null
@@ -255,6 +258,7 @@ export type Database = {
           created_by?: string | null
           date: string
           date_debut?: string | null
+          date_facturation?: string | null
           date_fin?: string | null
           id?: string
           isin?: string | null
@@ -283,6 +287,7 @@ export type Database = {
           created_by?: string | null
           date?: string
           date_debut?: string | null
+          date_facturation?: string | null
           date_fin?: string | null
           id?: string
           isin?: string | null
@@ -340,6 +345,7 @@ export type Database = {
           commentaire: string | null
           compagnies_cibles: string | null
           created_at: string | null
+          date_constatation_initiale: string | null
           date_facturation: string | null
           date_fin_commercialisation: string | null
           degressivite: string | null
@@ -370,6 +376,7 @@ export type Database = {
           commentaire?: string | null
           compagnies_cibles?: string | null
           created_at?: string | null
+          date_constatation_initiale?: string | null
           date_facturation?: string | null
           date_fin_commercialisation?: string | null
           degressivite?: string | null
@@ -400,6 +407,7 @@ export type Database = {
           commentaire?: string | null
           compagnies_cibles?: string | null
           created_at?: string | null
+          date_constatation_initiale?: string | null
           date_facturation?: string | null
           date_fin_commercialisation?: string | null
           degressivite?: string | null
@@ -508,52 +516,186 @@ export type Database = {
         ]
       }
       ref_compagnies: {
-        Row: { active: boolean | null; id: number; label: string; ordre: number | null }
-        Insert: { active?: boolean | null; id?: number; label: string; ordre?: number | null }
-        Update: { active?: boolean | null; id?: number; label?: string; ordre?: number | null }
+        Row: {
+          active: boolean | null
+          id: number
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          id?: number
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          id?: number
+          label?: string
+          ordre?: number | null
+        }
         Relationships: []
       }
       ref_frequences: {
-        Row: { id: number; label: string; ordre: number | null }
-        Insert: { id?: number; label: string; ordre?: number | null }
-        Update: { id?: number; label?: string; ordre?: number | null }
+        Row: {
+          id: number
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          id?: number
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          id?: number
+          label?: string
+          ordre?: number | null
+        }
         Relationships: []
       }
       ref_operations: {
-        Row: { active: boolean | null; code: string | null; id: number; label: string; ordre: number | null }
-        Insert: { active?: boolean | null; code?: string | null; id?: number; label: string; ordre?: number | null }
-        Update: { active?: boolean | null; code?: string | null; id?: number; label?: string; ordre?: number | null }
+        Row: {
+          active: boolean | null
+          code: string | null
+          id: number
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          code?: string | null
+          id?: number
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          code?: string | null
+          id?: number
+          label?: string
+          ordre?: number | null
+        }
         Relationships: []
       }
       ref_passages: {
-        Row: { id: number; label: string }
-        Insert: { id?: number; label: string }
-        Update: { id?: number; label?: string }
+        Row: {
+          id: number
+          label: string
+        }
+        Insert: {
+          id?: number
+          label: string
+        }
+        Update: {
+          id?: number
+          label?: string
+        }
         Relationships: []
       }
       ref_produits: {
-        Row: { active: boolean | null; id: number; label: string; ordre: number | null }
-        Insert: { active?: boolean | null; id?: number; label: string; ordre?: number | null }
-        Update: { active?: boolean | null; id?: number; label?: string; ordre?: number | null }
+        Row: {
+          active: boolean | null
+          id: number
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          id?: number
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          id?: number
+          label?: string
+          ordre?: number | null
+        }
         Relationships: []
       }
       ref_statuts: {
-        Row: { active: boolean | null; id: number; is_final: boolean | null; label: string; ordre: number | null }
-        Insert: { active?: boolean | null; id?: number; is_final?: boolean | null; label: string; ordre?: number | null }
-        Update: { active?: boolean | null; id?: number; is_final?: boolean | null; label?: string; ordre?: number | null }
+        Row: {
+          active: boolean | null
+          id: number
+          is_final: boolean | null
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          id?: number
+          is_final?: boolean | null
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          id?: number
+          is_final?: boolean | null
+          label?: string
+          ordre?: number | null
+        }
         Relationships: []
       }
       ref_statuts_controle: {
-        Row: { code: string; color: string | null; id: number; label: string; ordre: number | null }
-        Insert: { code: string; color?: string | null; id?: number; label: string; ordre?: number | null }
-        Update: { code?: string; color?: string | null; id?: number; label?: string; ordre?: number | null }
+        Row: {
+          code: string
+          color: string | null
+          id: number
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          code: string
+          color?: string | null
+          id?: number
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          code?: string
+          color?: string | null
+          id?: number
+          label?: string
+          ordre?: number | null
+        }
+        Relationships: []
+      }
+      ref_structureurs: {
+        Row: {
+          active: boolean | null
+          id: number
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          id?: number
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          id?: number
+          label?: string
+          ordre?: number | null
+        }
         Relationships: []
       }
     }
-    Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
-    Enums: { [_ in never]: never }
-    CompositeTypes: { [_ in never]: never }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
 

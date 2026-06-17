@@ -55,12 +55,12 @@ export default async function ProduitDetailPage({ params }: PageProps) {
   ] = await Promise.all([
     supabase
       .from("produits_structures")
-      .select("isin, nom_produit, sous_jacent, mecanisme, duree, frequence_rappel, protection_gain, protection_capital, degressivite, objectif_rendement, eligible_contrats, upfront_brut, date_fin_commercialisation, enveloppe_reservee, montant_fait, restant_a_faire, compagnies_cibles, commentaire, active, structureur, total_new_cash, total_encours, ca_up_front, mois_creation, date_facturation, statut_facturation")
+      .select("isin, nom_produit, sous_jacent, mecanisme, duree, frequence_rappel, protection_gain, protection_capital, degressivite, objectif_rendement, eligible_contrats, upfront_brut, date_fin_commercialisation, enveloppe_reservee, montant_fait, restant_a_faire, compagnies_cibles, commentaire, active, structureur, total_new_cash, total_encours, ca_up_front, mois_creation, date_facturation, statut_facturation, date_constatation_initiale")
       .eq("isin", decodedIsin)
       .single(),
     supabase
       .from("operations")
-      .select("id, date, type_operation, montant, collecte_type, conseiller_code, statut, compagnie, contrat, produit, isin, client_id, commentaire, clients(id, nom, prenom)")
+      .select("id, date, type_operation, montant, collecte_type, conseiller_code, statut, compagnie, contrat, produit, isin, client_id, commentaire, date_facturation, clients(id, nom, prenom)")
       .eq("isin", decodedIsin)
       .order("date", { ascending: false }),
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
@@ -152,6 +152,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
                 <Row label="Sous-jacent" value={produit.sous_jacent} />
                 <Row label="Mécanisme" value={produit.mecanisme} />
                 <Row label="Durée" value={produit.duree} />
+                <Row label="Date de constatation initiale" value={formatDate(produit.date_constatation_initiale)} />
                 <Row label="Fréquence rappel" value={produit.frequence_rappel} />
                 <Row label="Date fin commercialisation" value={formatDate(produit.date_fin_commercialisation)} />
                 <Row label="Éligible contrats" value={produit.eligible_contrats} />
@@ -247,6 +248,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
             totalMontant={totalMontant}
             totalNewCash={totalNewCash}
             totalEncours={totalEncours}
+            restantAFaire={produit.restant_a_faire ?? null}
           />
         </div>
       </div>

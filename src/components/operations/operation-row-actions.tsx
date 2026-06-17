@@ -79,6 +79,7 @@ export function OperationRowActions({
       courrier_pea: String(fd.get("courrier_pea") || "a_faire"),
       lettre_mission: String(fd.get("lettre_mission") || "a_faire"),
       conformite: String(fd.get("conformite") || "a_faire"),
+      date_facturation: String(fd.get("date_facturation") || ""),
     };
     const result = await updateOperation(operation.id, data);
     setSaving(false);

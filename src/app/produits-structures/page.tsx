@@ -37,14 +37,16 @@ export default async function ProduitsStructuresPage({ searchParams }: PageProps
     { data: allForDistinct },
     { data: refFrequences },
     { data: refCompagnies },
+    { data: refStructureurs },
   ] = await Promise.all([
     query,
     supabase
       .from("produits_structures")
-      .select("mecanisme, duree, eligible_contrats, structureur")
+      .select("mecanisme, duree, eligible_contrats")
       .eq("active", true),
     supabase.from("ref_frequences").select("id, label, ordre").order("ordre"),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("ref_structureurs").select("id, label, ordre, active").eq("active", true).order("ordre"),
   ]);
 
   // Filtrage textuel
@@ -60,7 +62,8 @@ export default async function ProduitsStructuresPage({ searchParams }: PageProps
   const mecanismes = unique((allForDistinct ?? []).map((p) => p.mecanisme));
   const durees = unique((allForDistinct ?? []).map((p) => p.duree));
   const eligibleContrats = unique((allForDistinct ?? []).map((p) => p.eligible_contrats));
-  const structureurs = unique((allForDistinct ?? []).map((p) => p.structureur));
+  // TÂCHE C : structureurs depuis ref_structureurs
+  const structureurs = (refStructureurs ?? []).map((s) => s.label);
   const frequences = (refFrequences ?? []).map((f) => f.label);
 
   return (
