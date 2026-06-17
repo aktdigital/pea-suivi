@@ -2,6 +2,7 @@ import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { ClientsFilters } from "@/components/clients/clients-filters";
 import { NouveauClientDialog } from "@/components/clients/nouveau-client-dialog";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, ChevronLeft } from "lucide-react";
@@ -83,6 +84,12 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     return `/clients?${sp.toString()}`;
   }
 
+  // URL export CSV avec filtres actifs
+  const exportParams = new URLSearchParams();
+  if (params.conseiller) exportParams.set("conseiller", params.conseiller);
+  if (params.q) exportParams.set("q", params.q);
+  const exportHref = `/clients/export${exportParams.toString() ? `?${exportParams.toString()}` : ""}`;
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -94,7 +101,10 @@ export default async function ClientsPage({ searchParams }: PageProps) {
               {totalPages > 1 && ` Page ${page} / ${totalPages}.`}
             </p>
           </div>
-          <NouveauClientDialog conseillers={conseillers ?? []} />
+          <div className="flex items-center gap-2">
+            <ExportCsvButton href={exportHref} />
+            <NouveauClientDialog conseillers={conseillers ?? []} />
+          </div>
         </div>
 
         <ClientsFilters conseillers={conseillers ?? []} />

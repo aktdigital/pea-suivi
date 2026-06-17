@@ -6,6 +6,7 @@ import { formatCurrency } from "@/lib/utils";
 import { OperationsFilters } from "@/components/operations/operations-filters";
 import { OperationsTable } from "@/components/operations/operations-table";
 import { OperationFormButton } from "@/components/operations/operation-form";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { TrendingUp, Banknote, RefreshCw, AlertCircle } from "lucide-react";
 import type { Client, Conseiller } from "@/lib/types";
 
@@ -76,6 +77,19 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     { label: "En cours", value: nbEnCours, icon: AlertCircle, suffix: "" },
   ];
 
+  // URL export CSV avec tous les filtres actifs
+  const exportOpsParams = new URLSearchParams();
+  if (params.mois) exportOpsParams.set("mois", params.mois);
+  if (params.conseiller) exportOpsParams.set("conseiller", params.conseiller);
+  if (params.statut) exportOpsParams.set("statut", params.statut);
+  if (params.type) exportOpsParams.set("type", params.type);
+  if (params.q) exportOpsParams.set("q", params.q);
+  if (params.controle_a_faire) exportOpsParams.set("controle_a_faire", params.controle_a_faire);
+  if (params.par) exportOpsParams.set("par", params.par);
+  if (params.isin) exportOpsParams.set("isin", params.isin);
+  if (params.compagnie) exportOpsParams.set("compagnie", params.compagnie);
+  const exportOpsHref = `/operations/export${exportOpsParams.toString() ? `?${exportOpsParams.toString()}` : ""}`;
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -86,15 +100,18 @@ export default async function OperationsPage({ searchParams }: PageProps) {
               Suivi des souscriptions, rachats, arbitrages et autres opérations.
             </p>
           </div>
-          <OperationFormButton
-            clients={(clients ?? []) as Client[]}
-            conseillers={(conseillers ?? []) as Conseiller[]}
-            typeOps={refOps ?? []}
-            produits={refProduits ?? []}
-            statuts={refStatuts ?? []}
-            compagnies={refCompagnies ?? []}
-            produitsStructures={produitsStructures ?? []}
-          />
+          <div className="flex items-center gap-2">
+            <ExportCsvButton href={exportOpsHref} />
+            <OperationFormButton
+              clients={(clients ?? []) as Client[]}
+              conseillers={(conseillers ?? []) as Conseiller[]}
+              typeOps={refOps ?? []}
+              produits={refProduits ?? []}
+              statuts={refStatuts ?? []}
+              compagnies={refCompagnies ?? []}
+              produitsStructures={produitsStructures ?? []}
+            />
+          </div>
         </div>
 
         {/* KPI cards */}
