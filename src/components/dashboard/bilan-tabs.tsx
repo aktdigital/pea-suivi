@@ -174,6 +174,10 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
   );
   const [activeTab, setActiveTab] = useState<string>("mensuel");
 
+  // ── État plage de dates personnalisée ────────────────────────────────────────
+  const [customStart, setCustomStart] = useState<string>("2026-01-01");
+  const [customEnd, setCustomEnd] = useState<string>(todayStr());
+
   // ── Lookup profiles ─────────────────────────────────────────────────────────
   const profileById = useMemo(() => {
     const m = new Map<string, Profile>();
@@ -370,6 +374,47 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
 
   const weekGrandTotal = weeklyMatrix.reduce((acc, r) => acc + r.total, 0);
 
+  // ── Vue personnalisée (plage de dates) ───────────────────────────────────────
+  // Les dates ISO "YYYY-MM-DD" se comparent lexicographiquement = chronologiquement.
+  const customMatrix = useMemo(() =>
+    OP_LABELS_ORDER.map((label) => {
+      const counts: Record<string, number> = {}; // key = rowKey (ou '__all')
+      let total = 0;
+      for (const op of activeOps) {
+        if (mapTypeOp(op.type_operation) !== label) continue;
+        if (!op.date) continue;
+        if (customStart && op.date < customStart) continue;
+        if (customEnd && op.date > customEnd) continue;
+        if (peopleRows.length === 0) {
+          counts["__all"] = (counts["__all"] ?? 0) + 1;
+          total++;
+        } else {
+          for (const row of peopleRows) {
+            if (row.predicate(op)) {
+              counts[row.key] = (counts[row.key] ?? 0) + 1;
+              total++;
+              break;
+            }
+          }
+        }
+      }
+      return { label, counts, total };
+    }),
+  [activeOps, peopleRows, customStart, customEnd]);
+
+  const customColTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const row of peopleRows) {
+      totals[row.key] = customMatrix.reduce((acc, r) => acc + (r.counts[row.key] ?? 0), 0);
+    }
+    if (peopleRows.length === 0) {
+      totals["__all"] = customMatrix.reduce((acc, r) => acc + (r.counts["__all"] ?? 0), 0);
+    }
+    return totals;
+  }, [customMatrix, peopleRows]);
+
+  const customGrandTotal = customMatrix.reduce((acc, r) => acc + r.total, 0);
+
   // ── Export CSV ──────────────────────────────────────────────────────────────
   function exportMensuelCsv() {
     const today = todayStr();
@@ -452,6 +497,33 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
     downloadCsv(csv, `bilan_hebdo_S${weekNum}_${today}.csv`);
   }
 
+  function exportPersoCsv() {
+    const headers = [
+      "Opération",
+      ...(peopleRows.length === 0 ? ["Tous"] : peopleRows.map((r) => r.label)),
+      "Total",
+    ];
+    const rows: string[][] = [];
+    for (const row of customMatrix) {
+      rows.push([
+        row.label,
+        ...(peopleRows.length === 0
+          ? [String(row.counts["__all"] ?? 0)]
+          : peopleRows.map((pr) => String(row.counts[pr.key] ?? 0))),
+        String(row.total),
+      ]);
+    }
+    rows.push([
+      "TOTAL",
+      ...(peopleRows.length === 0
+        ? [String(customColTotals["__all"] ?? 0)]
+        : peopleRows.map((pr) => String(customColTotals[pr.key] ?? 0))),
+      String(customGrandTotal),
+    ]);
+    const csv = serializeCsv(headers, rows);
+    downloadCsv(csv, `bilan_perso_${customStart}_${customEnd}.csv`);
+  }
+
   // ── Classes partagées ───────────────────────────────────────────────────────
   const btnOutline =
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors h-8 px-3 py-1.5 border border-pea-gray/40 bg-pea-cream text-pea-blue hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&_svg]:size-4 [&_svg]:shrink-0";
@@ -482,7 +554,13 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
         </div>
         <button
           type="button"
-          onClick={activeTab === "mensuel" ? exportMensuelCsv : exportHedboCsv}
+          onClick={
+            activeTab === "mensuel"
+              ? exportMensuelCsv
+              : activeTab === "hebdo"
+              ? exportHedboCsv
+              : exportPersoCsv
+          }
           className={btnOutline}
         >
           <Download />
@@ -563,6 +641,7 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
           <TabsList className="mb-3">
             <TabsTrigger value="mensuel">Vue mensuelle</TabsTrigger>
             <TabsTrigger value="hebdo">Vue hebdomadaire</TabsTrigger>
+            <TabsTrigger value="perso">Vue personnalisée</TabsTrigger>
           </TabsList>
         </div>
 
@@ -786,6 +865,117 @@ export function BilanHebdoTabs({ operations, profiles, conseillers }: BilanHebdo
                     )}
                     <td className="px-4 py-2 text-center font-bold text-pea-graphite">
                       {weekGrandTotal}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </TabsContent>
+
+        {/* ── Onglet personnalisé (plage de dates) ── */}
+        <TabsContent value="perso">
+          <CardContent className="p-0">
+            <div className="px-4 py-3 flex items-end gap-3 flex-wrap">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="bilan-debut" className="text-xs font-medium text-pea-gray uppercase tracking-wide">
+                  Du
+                </label>
+                <input
+                  id="bilan-debut"
+                  type="date"
+                  value={customStart}
+                  max={customEnd || undefined}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="h-9 rounded-md border border-pea-gray/40 bg-white px-3 text-sm text-pea-graphite focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="bilan-fin" className="text-xs font-medium text-pea-gray uppercase tracking-wide">
+                  Au
+                </label>
+                <input
+                  id="bilan-fin"
+                  type="date"
+                  value={customEnd}
+                  min={customStart || undefined}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="h-9 rounded-md border border-pea-gray/40 bg-white px-3 text-sm text-pea-graphite focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+              {customEnd && customStart && customEnd < customStart && (
+                <span className="text-xs text-pea-rust pb-2">La date de fin précède la date de début.</span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-pea-blue/5">
+                    <th className="text-left px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
+                      Opération
+                    </th>
+                    {peopleRows.length === 0 ? (
+                      <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
+                        Tous
+                      </th>
+                    ) : (
+                      peopleRows.map((pr) => (
+                        <th
+                          key={pr.key}
+                          className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap"
+                        >
+                          {pr.label}
+                        </th>
+                      ))
+                    )}
+                    <th className="text-center px-4 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customMatrix.map((row, i) => (
+                    <tr
+                      key={row.label}
+                      className={`border-b last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
+                    >
+                      <td className="px-4 py-2 whitespace-nowrap text-pea-graphite">
+                        {row.label}
+                      </td>
+                      {peopleRows.length === 0 ? (
+                        <td className="px-4 py-2 text-center whitespace-nowrap font-semibold text-pea-teal">
+                          {row.counts["__all"] ?? 0}
+                        </td>
+                      ) : (
+                        peopleRows.map((pr) => (
+                          <td key={pr.key} className="px-4 py-2 text-center whitespace-nowrap">
+                            <ColorBadge n={row.counts[pr.key] ?? 0} colorIdx={pr.colorIdx} />
+                          </td>
+                        ))
+                      )}
+                      <td className="px-4 py-2 text-center whitespace-nowrap font-semibold text-pea-graphite">
+                        {row.total}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Ligne TOTAL */}
+                  <tr className="border-t-2 font-bold bg-pea-blue/5">
+                    <td className="px-4 py-2 whitespace-nowrap text-pea-blue uppercase text-xs tracking-wide">
+                      TOTAL
+                    </td>
+                    {peopleRows.length === 0 ? (
+                      <td className="px-4 py-2 text-center font-bold text-pea-graphite">
+                        {customColTotals["__all"] ?? 0}
+                      </td>
+                    ) : (
+                      peopleRows.map((pr) => (
+                        <td key={pr.key} className="px-4 py-2 text-center">
+                          <ColorBadge n={customColTotals[pr.key] ?? 0} colorIdx={pr.colorIdx} />
+                        </td>
+                      ))
+                    )}
+                    <td className="px-4 py-2 text-center font-bold text-pea-graphite">
+                      {customGrandTotal}
                     </td>
                   </tr>
                 </tbody>
