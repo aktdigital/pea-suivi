@@ -14,6 +14,7 @@ interface OperationsTableProps {
   par?: string;
   isin?: string;
   compagnie?: string;
+  assistante?: string;
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -34,6 +35,7 @@ export async function OperationsTable({
   par,
   isin,
   compagnie,
+  assistante,
   clients,
   conseillers,
   typeOps,
@@ -72,6 +74,7 @@ export async function OperationsTable({
   if (par) query = query.eq("created_by", par);
   if (isin) query = query.ilike("isin", `%${isin}%`);
   if (compagnie) query = query.eq("compagnie", compagnie);
+  if (assistante) query = query.eq("assistante_id", assistante);
 
   const { data: operations, error } = await query;
 

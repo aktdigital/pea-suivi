@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const par = searchParams.get("par") ?? undefined;
   const isin = searchParams.get("isin") ?? undefined;
   const compagnie = searchParams.get("compagnie") ?? undefined;
+  const assistante = searchParams.get("assistante") ?? undefined;
 
   // Logique mois identique à la page
   const mois = (!moisRaw || moisRaw === "all") ? undefined : moisRaw;
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
   if (par) query = query.eq("created_by", par);
   if (isin) query = query.ilike("isin", `%${isin}%`);
   if (compagnie) query = query.eq("compagnie", compagnie);
+  if (assistante) query = query.eq("assistante_id", assistante);
 
   // Chargement référentiels en parallèle
   const [{ data: operations }, { data: conseillers }, { data: refStatutsControle }] = await Promise.all([

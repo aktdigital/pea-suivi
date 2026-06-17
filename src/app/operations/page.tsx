@@ -11,7 +11,7 @@ import { TrendingUp, Banknote, RefreshCw, AlertCircle } from "lucide-react";
 import type { Client, Conseiller } from "@/lib/types";
 
 interface PageProps {
-  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string; controle_a_faire?: string; par?: string; isin?: string; compagnie?: string }>;
+  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string; controle_a_faire?: string; par?: string; isin?: string; compagnie?: string; assistante?: string }>;
 }
 
 export default async function OperationsPage({ searchParams }: PageProps) {
@@ -35,6 +35,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     { data: clients },
     { data: produitsStructures },
     { data: assistantes },
+    { data: assistantesComm },
   ] = await Promise.all([
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
     supabase.from("ref_statuts").select("id, label, ordre, active").eq("active", true).order("ordre"),
@@ -44,6 +45,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
     supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
     supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "assistante_admin"]).order("full_name"),
+    supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "responsable"]).order("full_name"),
   ]);
 
   // KPIs toujours sur le mois affiché (mois sélectionné ou mois courant par défaut)
@@ -88,6 +90,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
   if (params.par) exportOpsParams.set("par", params.par);
   if (params.isin) exportOpsParams.set("isin", params.isin);
   if (params.compagnie) exportOpsParams.set("compagnie", params.compagnie);
+  if (params.assistante) exportOpsParams.set("assistante", params.assistante);
   const exportOpsHref = `/operations/export${exportOpsParams.toString() ? `?${exportOpsParams.toString()}` : ""}`;
 
   return (
@@ -135,6 +138,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
           statuts={refStatuts ?? []}
           typeOps={refOps ?? []}
           assistantes={assistantes ?? []}
+          assistantesCommerciales={assistantesComm ?? []}
           compagnies={refCompagnies ?? []}
         />
 
@@ -150,6 +154,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
             par={params.par}
             isin={params.isin}
             compagnie={params.compagnie}
+            assistante={params.assistante}
             clients={(clients ?? []) as Client[]}
             conseillers={(conseillers ?? []) as Conseiller[]}
             typeOps={refOps ?? []}

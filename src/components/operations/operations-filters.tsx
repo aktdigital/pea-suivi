@@ -10,10 +10,11 @@ interface FiltersProps {
   statuts: { id: number; label: string }[];
   typeOps: { id: number; label: string }[];
   assistantes: { id: string; full_name: string | null; email: string | null }[];
+  assistantesCommerciales: { id: string; full_name: string | null; email: string | null }[];
   compagnies: { id: number; label: string }[];
 }
 
-export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, compagnies }: FiltersProps) {
+export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, assistantesCommerciales, compagnies }: FiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -121,6 +122,21 @@ export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, 
         >
           <option value="">Toutes</option>
           {assistantes.map((a) => (
+            <option key={a.id} value={a.id}>{a.full_name ?? a.email ?? a.id}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Assistante commerciale */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Assistante commerciale</label>
+        <select
+          value={searchParams.get("assistante") ?? ""}
+          onChange={(e) => setParam("assistante", e.target.value)}
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
+        >
+          <option value="">Toutes</option>
+          {assistantesCommerciales.map((a) => (
             <option key={a.id} value={a.id}>{a.full_name ?? a.email ?? a.id}</option>
           ))}
         </select>
