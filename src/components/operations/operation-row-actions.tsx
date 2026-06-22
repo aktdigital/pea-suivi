@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { deleteOperation, updateOperation } from "@/app/operations/actions";
+import { deleteOperation, updateOperation, addRefValue } from "@/app/operations/actions";
 import type { OperationFormData } from "@/app/operations/actions";
 import type { Operation, Client, Conseiller } from "@/lib/types";
 import { OperationFormInner } from "./operation-form-inner";
@@ -19,6 +19,7 @@ interface RowActionsProps {
   produitsStructures: { isin: string; nom_produit: string }[];
   externalEditOpen?: boolean;
   onExternalEditClose?: () => void;
+  canManageRefs?: boolean;
 }
 
 export function OperationRowActions({
@@ -32,11 +33,28 @@ export function OperationRowActions({
   produitsStructures,
   externalEditOpen,
   onExternalEditClose,
+  canManageRefs = false,
 }: RowActionsProps) {
   const [deleting, setDeleting] = useState(false);
   const [internalEditOpen, setInternalEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [localTypeOps, setLocalTypeOps] = useState(typeOps);
+  const [localCompagnies, setLocalCompagnies] = useState(compagnies);
+
+  async function handleAddRef(kind: "compagnie" | "type", label: string): Promise<string | null> {
+    const result = await addRefValue(kind, label);
+    if (result.error) {
+      setError(result.error);
+      return null;
+    }
+    if (kind === "compagnie") {
+      setLocalCompagnies((prev) => [...prev, { id: Date.now(), label: result.value! }]);
+    } else {
+      setLocalTypeOps((prev) => [...prev, { id: Date.now(), label: result.value! }]);
+    }
+    return result.value ?? null;
+  }
 
   const editOpen = externalEditOpen ?? internalEditOpen;
 
@@ -72,7 +90,7 @@ export function OperationRowActions({
       collecte_type: (fd.get("collecte_type") as "new_cash" | "encours") || "new_cash",
       conseiller_code: String(fd.get("conseiller_code") || ""),
       statut: String(fd.get("statut") || ""),
-      support_type: (fd.get("support_type") as "papier" | "ligne") || "papier",
+      support_type: String(fd.get("support_type") || ""),
       isin: String(fd.get("isin") || ""),
       validation: fd.get("validation") === "on",
       commentaire: String(fd.get("commentaire") || ""),
@@ -125,15 +143,17 @@ export function OperationRowActions({
               defaultValues={operation}
               clients={clients}
               conseillers={conseillers}
-              typeOps={typeOps}
+              typeOps={localTypeOps}
               produits={produits}
               statuts={statuts}
-              compagnies={compagnies}
+              compagnies={localCompagnies}
               produitsStructures={produitsStructures}
               onSubmit={handleSubmit}
               saving={saving}
               error={error}
               onCancel={() => setEditOpen(false)}
+              canManageRefs={canManageRefs}
+              onAddRef={handleAddRef}
             />
           </div>
         </div>

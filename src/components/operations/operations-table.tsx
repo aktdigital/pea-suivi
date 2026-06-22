@@ -10,11 +10,12 @@ interface OperationsTableProps {
   statut?: string;
   type?: string;
   q?: string;
-  controleAFaire?: boolean;
   par?: string;
   isin?: string;
   compagnie?: string;
   assistante?: string;
+  support?: string;
+  contrat?: string;
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -22,6 +23,7 @@ interface OperationsTableProps {
   statuts: { id: number; label: string }[];
   compagnies: { id: number; label: string }[];
   produitsStructures: { isin: string; nom_produit: string }[];
+  canManageRefs?: boolean;
 }
 
 
@@ -31,11 +33,12 @@ export async function OperationsTable({
   statut,
   type,
   q,
-  controleAFaire,
   par,
   isin,
   compagnie,
   assistante,
+  support,
+  contrat,
   clients,
   conseillers,
   typeOps,
@@ -43,6 +46,7 @@ export async function OperationsTable({
   statuts,
   compagnies,
   produitsStructures,
+  canManageRefs = false,
 }: OperationsTableProps) {
   const supabase = await createClient();
 
@@ -54,10 +58,6 @@ export async function OperationsTable({
       created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
     `)
     .order("date", { ascending: false });
-
-  if (controleAFaire) {
-    query = query.or("courrier_pea.eq.a_faire,lettre_mission.eq.a_faire,conformite.eq.a_faire");
-  }
 
   // Filtre période
   if (mois) {
@@ -75,6 +75,8 @@ export async function OperationsTable({
   if (isin) query = query.ilike("isin", `%${isin}%`);
   if (compagnie) query = query.eq("compagnie", compagnie);
   if (assistante) query = query.eq("assistante_id", assistante);
+  if (support) query = query.eq("support_type", support);
+  if (contrat) query = query.ilike("contrat", `%${contrat}%`);
 
   const { data: operations, error } = await query;
 
@@ -132,9 +134,6 @@ export async function OperationsTable({
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Support</th>
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">ISIN</th>
             <th className="text-center px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Validé</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Courrier PEA</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Lettre mission</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Conformité</th>
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Commentaire</th>
             <th className="px-3 py-2"></th>
           </tr>
@@ -152,6 +151,7 @@ export async function OperationsTable({
               statuts={statuts}
               compagnies={compagnies}
               produitsStructures={produitsStructures}
+              canManageRefs={canManageRefs}
             />
           ))}
         </tbody>

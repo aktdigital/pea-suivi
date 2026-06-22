@@ -683,6 +683,27 @@ export type Database = {
         }
         Relationships: []
       }
+      ref_supports: {
+        Row: {
+          active: boolean | null
+          id: number
+          label: string
+          ordre: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          id?: number
+          label: string
+          ordre?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          id?: number
+          label?: string
+          ordre?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

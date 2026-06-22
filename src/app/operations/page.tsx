@@ -11,7 +11,7 @@ import { TrendingUp, Banknote, RefreshCw, AlertCircle } from "lucide-react";
 import type { Client, Conseiller } from "@/lib/types";
 
 interface PageProps {
-  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string; controle_a_faire?: string; par?: string; isin?: string; compagnie?: string; assistante?: string }>;
+  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string; par?: string; isin?: string; compagnie?: string; assistante?: string; support?: string; contrat?: string }>;
 }
 
 export default async function OperationsPage({ searchParams }: PageProps) {
@@ -36,6 +36,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     { data: produitsStructures },
     { data: assistantes },
     { data: assistantesComm },
+    { data: refSupports },
   ] = await Promise.all([
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
     supabase.from("ref_statuts").select("id, label, ordre, active").eq("active", true).order("ordre"),
@@ -46,7 +47,16 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
     supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "assistante_admin"]).order("full_name"),
     supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "responsable"]).order("full_name"),
+    supabase.from("ref_supports").select("id, label, ordre, active").eq("active", true).order("ordre"),
   ]);
+
+  // Calcul du rôle pour canManageRefs
+  const { data: { user } } = await supabase.auth.getUser();
+  let canManageRefs = false;
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    canManageRefs = profile?.role === "admin" || profile?.role === "responsable";
+  }
 
   // KPIs toujours sur le mois affiché (mois sélectionné ou mois courant par défaut)
   const [year, month] = moisForKpi.split("-");
@@ -86,11 +96,12 @@ export default async function OperationsPage({ searchParams }: PageProps) {
   if (params.statut) exportOpsParams.set("statut", params.statut);
   if (params.type) exportOpsParams.set("type", params.type);
   if (params.q) exportOpsParams.set("q", params.q);
-  if (params.controle_a_faire) exportOpsParams.set("controle_a_faire", params.controle_a_faire);
   if (params.par) exportOpsParams.set("par", params.par);
   if (params.isin) exportOpsParams.set("isin", params.isin);
   if (params.compagnie) exportOpsParams.set("compagnie", params.compagnie);
   if (params.assistante) exportOpsParams.set("assistante", params.assistante);
+  if (params.support) exportOpsParams.set("support", params.support);
+  if (params.contrat) exportOpsParams.set("contrat", params.contrat);
   const exportOpsHref = `/operations/export${exportOpsParams.toString() ? `?${exportOpsParams.toString()}` : ""}`;
 
   return (
@@ -113,6 +124,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
               statuts={refStatuts ?? []}
               compagnies={refCompagnies ?? []}
               produitsStructures={produitsStructures ?? []}
+              canManageRefs={canManageRefs}
             />
           </div>
         </div>
@@ -140,21 +152,23 @@ export default async function OperationsPage({ searchParams }: PageProps) {
           assistantes={assistantes ?? []}
           assistantesCommerciales={assistantesComm ?? []}
           compagnies={refCompagnies ?? []}
+          supports={refSupports ?? []}
         />
 
         {/* Tableau */}
         <Suspense fallback={<div className="text-sm text-muted-foreground">Chargement…</div>}>
           <OperationsTable
-            mois={params.controle_a_faire === "1" ? undefined : mois}
+            mois={mois}
             conseiller={params.conseiller}
             statut={params.statut}
             type={params.type}
             q={params.q}
-            controleAFaire={params.controle_a_faire === "1"}
             par={params.par}
             isin={params.isin}
             compagnie={params.compagnie}
             assistante={params.assistante}
+            support={params.support}
+            contrat={params.contrat}
             clients={(clients ?? []) as Client[]}
             conseillers={(conseillers ?? []) as Conseiller[]}
             typeOps={refOps ?? []}
@@ -162,6 +176,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
             statuts={refStatuts ?? []}
             compagnies={refCompagnies ?? []}
             produitsStructures={produitsStructures ?? []}
+            canManageRefs={canManageRefs}
           />
         </Suspense>
       </div>

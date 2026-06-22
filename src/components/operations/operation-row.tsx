@@ -5,7 +5,7 @@ import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { OperationRowActions } from "./operation-row-actions";
-import type { Client, Conseiller, Operation, StatutControle } from "@/lib/types";
+import type { Client, Conseiller, Operation } from "@/lib/types";
 
 type CreatedByProfile = { id: string; full_name: string | null; email: string | null } | null;
 
@@ -24,25 +24,7 @@ interface OperationRowProps {
   statuts: { id: number; label: string }[];
   compagnies: { id: number; label: string }[];
   produitsStructures: { isin: string; nom_produit: string }[];
-}
-
-function getControleVariant(statut: StatutControle | null | undefined): "default" | "success" | "warning" | "destructive" | "outline" | "secondary" | "info" {
-  if (!statut || statut === "a_faire") return "destructive";
-  if (statut === "so") return "secondary";
-  if (statut === "ok" || statut === "valide") return "success";
-  if (statut === "en_attente_avenants") return "warning";
-  if (statut === "en_cours_compagnie") return "info";
-  return "outline";
-}
-
-function getControleLabel(statut: StatutControle | null | undefined): string {
-  if (!statut || statut === "a_faire") return "À faire";
-  if (statut === "so") return "S/O";
-  if (statut === "ok") return "OK";
-  if (statut === "valide") return "Validé";
-  if (statut === "en_attente_avenants") return "En attente";
-  if (statut === "en_cours_compagnie") return "En cours";
-  return statut;
+  canManageRefs?: boolean;
 }
 
 function statutBgClass(statut: string | null): string {
@@ -75,6 +57,7 @@ export function OperationRow({
   statuts,
   compagnies,
   produitsStructures,
+  canManageRefs = false,
 }: OperationRowProps) {
   const [editOpen, setEditOpen] = useState(false);
 
@@ -130,7 +113,7 @@ export function OperationRow({
         ) : "—"}
       </td>
       <td className="px-3 py-2 whitespace-nowrap">
-        {op.support_type === "papier" ? "Papier" : op.support_type === "ligne" ? "Ligne" : "—"}
+        {op.support_type ?? "—"}
       </td>
       <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
         {op.isin ?? "—"}
@@ -141,21 +124,6 @@ export function OperationRow({
         ) : (
           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-gray/15 text-pea-gray text-xs">—</span>
         )}
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        <Badge variant={getControleVariant(op.courrier_pea as StatutControle)}>
-          {getControleLabel(op.courrier_pea as StatutControle)}
-        </Badge>
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        <Badge variant={getControleVariant(op.lettre_mission as StatutControle)}>
-          {getControleLabel(op.lettre_mission as StatutControle)}
-        </Badge>
-      </td>
-      <td className="px-3 py-2 whitespace-nowrap">
-        <Badge variant={getControleVariant(op.conformite as StatutControle)}>
-          {getControleLabel(op.conformite as StatutControle)}
-        </Badge>
       </td>
       <td className="px-3 py-2 max-w-[150px]">
         <span className="block truncate text-xs text-muted-foreground" title={op.commentaire ?? ""}>
@@ -174,6 +142,7 @@ export function OperationRow({
           produitsStructures={produitsStructures}
           externalEditOpen={editOpen}
           onExternalEditClose={() => setEditOpen(false)}
+          canManageRefs={canManageRefs}
         />
       </td>
     </tr>

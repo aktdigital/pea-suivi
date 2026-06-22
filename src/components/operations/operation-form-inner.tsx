@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Operation, Client, Conseiller, StatutControle } from "@/lib/types";
 import { STATUTS_CONTROLE } from "@/lib/types";
 
@@ -20,6 +21,67 @@ export interface OperationFormInnerProps {
   saving: boolean;
   error: string | null;
   onCancel: () => void;
+  canManageRefs?: boolean;
+  onAddRef?: (kind: "compagnie" | "type", label: string) => Promise<string | null>;
+  submitLabel?: string;
+}
+
+function AddRefInline({
+  kind,
+  onAdd,
+}: {
+  kind: "compagnie" | "type";
+  onAdd: (label: string) => Promise<void>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (!adding) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="text-xs text-pea-teal hover:underline mt-1 inline-block"
+      >
+        + Ajouter…
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex gap-1 mt-1 items-center">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={kind === "compagnie" ? "Nouvelle compagnie…" : "Nouveau type…"}
+        className="flex h-7 flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        autoFocus
+      />
+      <button
+        type="button"
+        disabled={busy || !value.trim()}
+        onClick={async () => {
+          setBusy(true);
+          await onAdd(value.trim());
+          setValue("");
+          setAdding(false);
+          setBusy(false);
+        }}
+        className="text-xs px-2 py-1 rounded bg-pea-teal text-white disabled:opacity-50"
+      >
+        OK
+      </button>
+      <button
+        type="button"
+        onClick={() => { setAdding(false); setValue(""); }}
+        className="text-xs px-2 py-1 rounded border border-pea-gray/30 text-pea-gray"
+      >
+        ✕
+      </button>
+    </div>
+  );
 }
 
 export function OperationFormInner({
@@ -35,8 +97,34 @@ export function OperationFormInner({
   saving,
   error,
   onCancel,
+  canManageRefs = false,
+  onAddRef,
+  submitLabel = "Enregistrer",
 }: OperationFormInnerProps) {
   const today = new Date().toISOString().split("T")[0];
+  // Local copies so newly added values appear immediately in the select
+  const [localTypeOps, setLocalTypeOps] = useState(typeOps);
+  const [localCompagnies, setLocalCompagnies] = useState(compagnies);
+  const [typeOpValue, setTypeOpValue] = useState(defaultValues?.type_operation ?? "");
+  const [compagnieValue, setCompagnieValue] = useState(defaultValues?.compagnie ?? "");
+
+  async function handleAddCompagnie(label: string) {
+    if (!onAddRef) return;
+    const result = await onAddRef("compagnie", label);
+    if (result) {
+      setLocalCompagnies((prev) => [...prev, { id: Date.now(), label: result }]);
+      setCompagnieValue(result);
+    }
+  }
+
+  async function handleAddType(label: string) {
+    if (!onAddRef) return;
+    const result = await onAddRef("type", label);
+    if (result) {
+      setLocalTypeOps((prev) => [...prev, { id: Date.now(), label: result }]);
+      setTypeOpValue(result);
+    }
+  }
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -56,12 +144,16 @@ export function OperationFormInner({
           <label className="text-sm font-medium">Type opération</label>
           <select
             name="type_operation"
-            defaultValue={defaultValues?.type_operation ?? ""}
+            value={typeOpValue}
+            onChange={(e) => setTypeOpValue(e.target.value)}
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="">— Sélectionner —</option>
-            {typeOps.map((t) => <option key={t.id} value={t.label}>{t.label}</option>)}
+            {localTypeOps.map((t) => <option key={t.id} value={t.label}>{t.label}</option>)}
           </select>
+          {canManageRefs && onAddRef && (
+            <AddRefInline kind="type" onAdd={handleAddType} />
+          )}
         </div>
 
         <div className="space-y-1">
@@ -96,12 +188,16 @@ export function OperationFormInner({
           <label className="text-sm font-medium">Compagnie</label>
           <select
             name="compagnie"
-            defaultValue={defaultValues?.compagnie ?? ""}
+            value={compagnieValue}
+            onChange={(e) => setCompagnieValue(e.target.value)}
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="">— Sélectionner —</option>
-            {compagnies.map((c) => <option key={c.id} value={c.label}>{c.label}</option>)}
+            {localCompagnies.map((c) => <option key={c.id} value={c.label}>{c.label}</option>)}
           </select>
+          {canManageRefs && onAddRef && (
+            <AddRefInline kind="compagnie" onAdd={handleAddCompagnie} />
+          )}
         </div>
 
         <div className="space-y-1">
@@ -199,16 +295,20 @@ export function OperationFormInner({
 
         <div className="space-y-1">
           <label className="text-sm font-medium">Support</label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="radio" name="support_type" value="papier" defaultChecked={defaultValues?.support_type === "papier" || !defaultValues?.support_type} />
-              Papier
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="radio" name="support_type" value="ligne" defaultChecked={defaultValues?.support_type === "ligne"} />
-              Ligne
-            </label>
-          </div>
+          <select
+            name="support_type"
+            defaultValue={defaultValues?.support_type ?? ""}
+            className="w-full h-9 rounded-md border border-input bg-white px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-pea-teal"
+          >
+            <option value="">—</option>
+            {["Papier", "En Ligne", "Mail", "Extranet", "Signature électronique externe"].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+            {defaultValues?.support_type &&
+              !["Papier", "En Ligne", "Mail", "Extranet", "Signature électronique externe"].includes(defaultValues.support_type) && (
+                <option value={defaultValues.support_type}>{defaultValues.support_type}</option>
+              )}
+          </select>
         </div>
 
         <div className="space-y-1">
@@ -295,7 +395,7 @@ export function OperationFormInner({
           disabled={saving}
           className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {saving ? "Enregistrement…" : "Enregistrer"}
+          {saving ? "Enregistrement…" : submitLabel}
         </button>
       </div>
     </form>

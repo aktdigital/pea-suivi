@@ -12,9 +12,10 @@ interface FiltersProps {
   assistantes: { id: string; full_name: string | null; email: string | null }[];
   assistantesCommerciales: { id: string; full_name: string | null; email: string | null }[];
   compagnies: { id: number; label: string }[];
+  supports: { id: number; label: string }[];
 }
 
-export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, assistantesCommerciales, compagnies }: FiltersProps) {
+export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, assistantesCommerciales, compagnies, supports }: FiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -167,6 +168,35 @@ export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, 
             <option key={c.id} value={c.label}>{c.label}</option>
           ))}
         </select>
+      </div>
+
+      {/* Support */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Support</label>
+        <select
+          value={searchParams.get("support") ?? ""}
+          onChange={(e) => setParam("support", e.target.value)}
+          className="h-9 rounded-md border border-pea-gray/30 bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-pea-teal text-pea-graphite"
+        >
+          <option value="">Tous</option>
+          {supports.map((s) => (
+            <option key={s.id} value={s.label}>
+              {s.label === "papier" ? "Papier" : s.label === "ligne" ? "Ligne" : s.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Contrat */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Contrat</label>
+        <Input
+          type="search"
+          placeholder="N° contrat…"
+          defaultValue={searchParams.get("contrat") ?? ""}
+          onChange={(e) => setParam("contrat", e.target.value)}
+          className="w-40"
+        />
       </div>
     </div>
   );

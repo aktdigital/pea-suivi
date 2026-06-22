@@ -74,6 +74,14 @@ export default async function ProduitDetailPage({ params }: PageProps) {
 
   if (!produit) notFound();
 
+  // Calcul canManageRefs pour ce user
+  const { data: { user } } = await supabase.auth.getUser();
+  let canManageRefs = false;
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    canManageRefs = profile?.role === "admin" || profile?.role === "responsable";
+  }
+
   const pct = produit.enveloppe_reservee && produit.montant_fait
     ? Math.min((produit.montant_fait / produit.enveloppe_reservee) * 100, 100)
     : 0;
@@ -136,6 +144,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
               compagnies={refCompagnies ?? []}
               produitsStructures={produitsStructures ?? []}
               defaultIsin={decodedIsin}
+              canManageRefs={canManageRefs}
             />
           </div>
         </div>

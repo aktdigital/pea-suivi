@@ -1,12 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, ListChecks, Users, LogOut, Layers, TrendingUp } from "lucide-react";
+import { LayoutDashboard, ListChecks, Users, LogOut, Layers, TrendingUp, ShieldCheck } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/server";
 
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/operations", label: "Opérations", icon: ListChecks },
+  { href: "/controles", label: "Contrôles", icon: ShieldCheck },
   { href: "/clients", label: "Clients", icon: Users },
   { href: "/produits-structures", label: "Produits Structurés", icon: Layers },
   { href: "/engagement-structure", label: "Suivi des engagements structurés", icon: TrendingUp },

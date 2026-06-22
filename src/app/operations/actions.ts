@@ -17,7 +17,7 @@ export type OperationFormData = {
   collecte_type: "new_cash" | "encours";
   conseiller_code: string;
   statut: string;
-  support_type: "papier" | "ligne";
+  support_type: string;
   isin: string;
   validation: boolean;
   commentaire: string;
@@ -123,4 +123,52 @@ export async function deleteOperation(id: string) {
   revalidatePath("/operations");
   revalidatePath("/");
   return { success: true };
+}
+
+export async function addRefValue(kind: "compagnie" | "type", label: string): Promise<{ value?: string; error?: string }> {
+  const supabase = await createClient();
+
+  // Sécurité : vérifier que l'utilisateur est admin ou responsable
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "admin" && profile?.role !== "responsable") {
+    return { error: "Permission refusée : rôle insuffisant" };
+  }
+
+  const trimmedLabel = label.trim();
+  if (!trimmedLabel) return { error: "Le libellé ne peut pas être vide" };
+
+  const table = kind === "compagnie" ? "ref_compagnies" : "ref_operations";
+
+  // Calcul du prochain ordre
+  const { data: maxRow } = await supabase
+    .from(table)
+    .select("ordre")
+    .order("ordre", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextOrdre = ((maxRow as { ordre: number } | null)?.ordre ?? 0) + 10;
+
+  const { error } = await supabase
+    .from(table)
+    .insert({ label: trimmedLabel, ordre: nextOrdre, active: true })
+    .select()
+    .single();
+
+  // On ignore le conflit sur le label (ON CONFLICT DO NOTHING équivalent via upsert)
+  if (error && !error.message.includes("duplicate")) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/operations");
+  revalidatePath("/produits-structures");
+  return { value: trimmedLabel };
 }

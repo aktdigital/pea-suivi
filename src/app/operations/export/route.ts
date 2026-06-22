@@ -11,17 +11,16 @@ export async function GET(request: NextRequest) {
   const statut = searchParams.get("statut") ?? undefined;
   const type = searchParams.get("type") ?? undefined;
   const q = searchParams.get("q") ?? undefined;
-  const controleAFaireRaw = searchParams.get("controle_a_faire") ?? undefined;
   const par = searchParams.get("par") ?? undefined;
   const isin = searchParams.get("isin") ?? undefined;
   const compagnie = searchParams.get("compagnie") ?? undefined;
   const assistante = searchParams.get("assistante") ?? undefined;
+  const support = searchParams.get("support") ?? undefined;
+  const contrat = searchParams.get("contrat") ?? undefined;
 
   // Logique mois identique à la page
   const mois = (!moisRaw || moisRaw === "all") ? undefined : moisRaw;
-  const controleAFaire = controleAFaireRaw === "1";
-  // Si controle_a_faire, on n'applique pas de filtre mois
-  const moisEffectif = controleAFaire ? undefined : mois;
+  const moisEffectif = mois;
 
   const supabase = await createClient();
 
@@ -34,10 +33,6 @@ export async function GET(request: NextRequest) {
       created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
     `)
     .order("date", { ascending: false });
-
-  if (controleAFaire) {
-    query = query.or("courrier_pea.eq.a_faire,lettre_mission.eq.a_faire,conformite.eq.a_faire");
-  }
 
   if (moisEffectif) {
     const [year, month] = moisEffectif.split("-");
@@ -54,6 +49,8 @@ export async function GET(request: NextRequest) {
   if (isin) query = query.ilike("isin", `%${isin}%`);
   if (compagnie) query = query.eq("compagnie", compagnie);
   if (assistante) query = query.eq("assistante_id", assistante);
+  if (support) query = query.eq("support_type", support);
+  if (contrat) query = query.ilike("contrat", `%${contrat}%`);
 
   // Chargement référentiels en parallèle
   const [{ data: operations }, { data: conseillers }, { data: refStatutsControle }] = await Promise.all([
