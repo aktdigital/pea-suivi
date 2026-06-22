@@ -9,7 +9,7 @@ import { ControleStatutsManager } from "@/components/controles/controle-statuts-
 import { ShieldCheck } from "lucide-react";
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; conseiller?: string }>;
+  searchParams: Promise<{ q?: string; conseiller?: string; mois?: string; compagnie?: string; contrat?: string; courrier_pea?: string; lettre_mission?: string; conformite?: string }>;
 }
 
 export default async function ControlesPage({ searchParams }: PageProps) {
@@ -19,9 +19,11 @@ export default async function ControlesPage({ searchParams }: PageProps) {
   const [
     { data: refStatutsControle },
     { data: conseillers },
+    { data: refCompagnies },
   ] = await Promise.all([
     supabase.from("ref_statuts_controle").select("code, label, ordre").order("ordre"),
     supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
+    supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
   ]);
 
   const statuts = refStatutsControle ?? [];
@@ -43,8 +45,16 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     `)
     .order("date", { ascending: false });
 
-  if (params.conseiller) {
-    query = query.eq("conseiller_code", params.conseiller);
+  if (params.conseiller) query = query.eq("conseiller_code", params.conseiller);
+  if (params.compagnie) query = query.eq("compagnie", params.compagnie);
+  if (params.contrat) query = query.ilike("contrat", `%${params.contrat}%`);
+  if (params.courrier_pea) query = query.eq("courrier_pea", params.courrier_pea);
+  if (params.lettre_mission) query = query.eq("lettre_mission", params.lettre_mission);
+  if (params.conformite) query = query.eq("conformite", params.conformite);
+  if (params.mois) {
+    const [year, month] = params.mois.split("-");
+    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    query = query.gte("date", `${year}-${month}-01`).lte("date", `${year}-${month}-${lastDay}`);
   }
 
   const { data: operations, error } = await query;
@@ -97,7 +107,7 @@ export default async function ControlesPage({ searchParams }: PageProps) {
 
         {/* Filtres */}
         <Suspense>
-          <ControleFiltersClient conseillers={conseillers ?? []} initialQ={params.q ?? ""} initialConseiller={params.conseiller ?? ""} />
+          <ControleFiltersClient conseillers={conseillers ?? []} compagnies={refCompagnies ?? []} statutsControle={statuts} />
         </Suspense>
 
         {/* Tableau */}
