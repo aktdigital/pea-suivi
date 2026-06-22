@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,8 @@ export function OperationRowActions({
   hideTrigger = false,
 }: RowActionsProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [deleting, setDeleting] = useState(false);
   const [internalEditOpen, setInternalEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -140,8 +143,8 @@ export function OperationRowActions({
         </div>
       )}
 
-      {editOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      {editOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-no-row-click>
           <div className="bg-background rounded-lg border shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Modifier l&apos;opération</h2>
@@ -164,7 +167,8 @@ export function OperationRowActions({
               onAddRef={handleAddRef}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

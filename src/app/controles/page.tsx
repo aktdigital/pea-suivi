@@ -6,6 +6,8 @@ import { formatDate } from "@/lib/utils";
 import { ControleCell } from "@/components/controles/controle-cell";
 import { ControleFiltersClient } from "@/components/controles/controle-filters";
 import { ControleStatutsManager } from "@/components/controles/controle-statuts-manager";
+import { OperationClickableRow } from "@/components/operations/operation-clickable-row";
+import type { Operation, Client, Conseiller } from "@/lib/types";
 import { ShieldCheck } from "lucide-react";
 
 interface PageProps {
@@ -20,27 +22,40 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     { data: refStatutsControle },
     { data: conseillers },
     { data: refCompagnies },
+    { data: clients },
+    { data: refOps },
+    { data: refProduits },
+    { data: refStatuts },
+    { data: produitsStructures },
   ] = await Promise.all([
     supabase.from("ref_statuts_controle").select("code, label, ordre, champ").order("ordre"),
-    supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
+    supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
+    supabase.from("ref_operations").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("ref_produits").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("ref_statuts").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
   ]);
 
   const statuts = refStatutsControle ?? [];
 
-  // Rôle : Michèle (assistante_admin), Sonia (responsable), Piyanat (admin) peuvent gérer la liste de valeurs
+  // Rôles : gestion des valeurs (admin/responsable/assistante_admin) ; +Ajouter compagnie/type (admin/responsable)
   const { data: { user } } = await supabase.auth.getUser();
   let canManageControles = false;
+  let canManageRefs = false;
   if (user) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    canManageControles = ["admin", "responsable", "assistante_admin"].includes(profile?.role ?? "");
+    const role = profile?.role ?? "";
+    canManageControles = ["admin", "responsable", "assistante_admin"].includes(role);
+    canManageRefs = ["admin", "responsable"].includes(role);
   }
 
   // Requête opérations avec jointure clients
   let query = supabase
     .from("operations")
     .select(`
-      id, date, type_operation, compagnie, contrat, conseiller_code, courrier_pea, lettre_mission, conformite, client_id,
+      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, date_facturation, created_at, updated_at, client_id,
       clients(nom, prenom)
     `)
     .order("date", { ascending: false });
@@ -59,21 +74,9 @@ export default async function ControlesPage({ searchParams }: PageProps) {
 
   const { data: operations, error } = await query;
 
-  type OpRow = {
-    id: string;
-    date: string;
-    type_operation: string | null;
-    compagnie: string | null;
-    contrat: string | null;
-    conseiller_code: string | null;
-    courrier_pea: string | null;
-    lettre_mission: string | null;
-    conformite: string | null;
-    client_id: string | null;
-    clients?: { nom: string; prenom: string | null } | null;
-  };
+  type OpRow = Operation & { clients?: { nom: string; prenom: string | null } | null };
 
-  let filtered: OpRow[] = (operations ?? []) as OpRow[];
+  let filtered: OpRow[] = (operations ?? []) as unknown as OpRow[];
 
   // Filtre recherche client en mémoire
   if (params.q) {
@@ -136,8 +139,17 @@ export default async function ControlesPage({ searchParams }: PageProps) {
               </thead>
               <tbody>
                 {filtered.map((op, i) => (
-                  <tr
+                  <OperationClickableRow
                     key={op.id}
+                    operation={op}
+                    clients={(clients ?? []) as Client[]}
+                    conseillers={(conseillers ?? []) as Conseiller[]}
+                    typeOps={refOps ?? []}
+                    produits={refProduits ?? []}
+                    statuts={refStatuts ?? []}
+                    compagnies={refCompagnies ?? []}
+                    produitsStructures={produitsStructures ?? []}
+                    canManageRefs={canManageRefs}
                     className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream/40"}`}
                   >
                     <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
@@ -183,7 +195,7 @@ export default async function ControlesPage({ searchParams }: PageProps) {
                         statutsControle={statuts}
                       />
                     </td>
-                  </tr>
+                  </OperationClickableRow>
                 ))}
               </tbody>
             </table>
