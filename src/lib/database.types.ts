@@ -640,6 +640,7 @@ export type Database = {
       }
       ref_statuts_controle: {
         Row: {
+          champ: string | null
           code: string
           color: string | null
           id: number
@@ -647,6 +648,7 @@ export type Database = {
           ordre: number | null
         }
         Insert: {
+          champ?: string | null
           code: string
           color?: string | null
           id?: number
@@ -654,6 +656,7 @@ export type Database = {
           ordre?: number | null
         }
         Update: {
+          champ?: string | null
           code?: string
           color?: string | null
           id?: number

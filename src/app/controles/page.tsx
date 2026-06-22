@@ -21,7 +21,7 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     { data: conseillers },
     { data: refCompagnies },
   ] = await Promise.all([
-    supabase.from("ref_statuts_controle").select("code, label, ordre").order("ordre"),
+    supabase.from("ref_statuts_controle").select("code, label, ordre, champ").order("ordre"),
     supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
   ]);

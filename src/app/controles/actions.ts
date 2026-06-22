@@ -59,16 +59,20 @@ function slugCode(label: string): string {
   );
 }
 
-export async function addControleStatut(label: string) {
+const CHAMPS_VALIDES = ["courrier_pea", "lettre_mission", "conformite"];
+
+export async function addControleStatut(label: string, champ?: string | null) {
   const { supabase, error: roleErr } = await checkGestionRole();
   if (roleErr) return { error: roleErr };
   const clean = (label ?? "").trim();
   if (!clean) return { error: "Libellé vide" };
+  const champScope = champ && CHAMPS_VALIDES.includes(champ) ? champ : null;
 
-  const { data: existing } = await supabase.from("ref_statuts_controle").select("code, label, ordre");
+  const { data: existing } = await supabase.from("ref_statuts_controle").select("code, label, ordre, champ");
   const codes = new Set((existing ?? []).map((s) => s.code));
-  if ((existing ?? []).some((s) => s.label.toLowerCase() === clean.toLowerCase())) {
-    return { error: "Cette valeur existe déjà" };
+  // doublon = même libellé dans le même périmètre (commun ou même champ)
+  if ((existing ?? []).some((s) => s.label.toLowerCase() === clean.toLowerCase() && (s.champ ?? null) === champScope)) {
+    return { error: "Cette valeur existe déjà dans cette liste" };
   }
   let code = slugCode(clean);
   let i = 2;
@@ -77,7 +81,7 @@ export async function addControleStatut(label: string) {
 
   const { error } = await supabase
     .from("ref_statuts_controle")
-    .insert({ code, label: clean, color: "gray", ordre: maxOrdre + 10 });
+    .insert({ code, label: clean, color: "gray", ordre: maxOrdre + 10, champ: champScope });
   if (error) return { error: error.message };
 
   revalidatePath("/controles");

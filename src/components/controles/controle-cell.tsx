@@ -9,6 +9,7 @@ interface RefStatutControle {
   code: string;
   label: string;
   ordre: number | null;
+  champ: string | null;
 }
 
 interface ControleCellProps {
@@ -21,8 +22,11 @@ interface ControleCellProps {
 export function ControleCell({ opId, champ, valeurActuelle, statutsControle }: ControleCellProps) {
   const [isPending, startTransition] = useTransition();
 
-  // Vérifie si la valeur actuelle est un code connu dans ref_statuts_controle
-  const codesConnus = statutsControle.map((s) => s.code);
+  // Valeurs applicables à ce champ : communes (champ null) + spécifiques à ce champ
+  const options = statutsControle.filter((s) => s.champ == null || s.champ === champ);
+
+  // Vérifie si la valeur actuelle est un code connu (applicable à ce champ)
+  const codesConnus = options.map((s) => s.code);
   const estCodeConnu = valeurActuelle === null || codesConnus.includes(valeurActuelle ?? "");
 
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -45,7 +49,7 @@ export function ControleCell({ opId, champ, valeurActuelle, statutsControle }: C
       {!estCodeConnu && valeurActuelle && (
         <option value={valeurActuelle}>{valeurActuelle}</option>
       )}
-      {statutsControle.map((s) => (
+      {options.map((s) => (
         <option key={s.code} value={s.code}>{s.label}</option>
       ))}
     </select>
