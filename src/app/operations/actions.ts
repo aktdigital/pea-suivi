@@ -107,6 +107,8 @@ export async function updateOperation(id: string, formData: OperationFormData) {
   }
 
   revalidatePath("/operations");
+  revalidatePath("/clients", "layout");
+  revalidatePath("/produits-structures", "layout");
   revalidatePath("/");
   return { success: true };
 }
@@ -121,6 +123,8 @@ export async function deleteOperation(id: string) {
   }
 
   revalidatePath("/operations");
+  revalidatePath("/clients", "layout");
+  revalidatePath("/produits-structures", "layout");
   revalidatePath("/");
   return { success: true };
 }

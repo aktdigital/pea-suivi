@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { deleteOperation, updateOperation, addRefValue } from "@/app/operations/actions";
@@ -20,6 +21,7 @@ interface RowActionsProps {
   externalEditOpen?: boolean;
   onExternalEditClose?: () => void;
   canManageRefs?: boolean;
+  hideTrigger?: boolean;
 }
 
 export function OperationRowActions({
@@ -34,7 +36,9 @@ export function OperationRowActions({
   externalEditOpen,
   onExternalEditClose,
   canManageRefs = false,
+  hideTrigger = false,
 }: RowActionsProps) {
+  const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [internalEditOpen, setInternalEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -72,6 +76,7 @@ export function OperationRowActions({
     setDeleting(true);
     await deleteOperation(operation.id);
     setDeleting(false);
+    router.refresh();
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -105,32 +110,35 @@ export function OperationRowActions({
       setError(result.error);
     } else {
       setEditOpen(false);
+      router.refresh();
     }
   }
 
   return (
     <>
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => setEditOpen(true)}
-          title="Modifier"
-        >
-          <Pencil className="size-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-destructive hover:text-destructive"
-          onClick={handleDelete}
-          disabled={deleting}
-          title="Supprimer"
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
-      </div>
+      {!hideTrigger && (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => setEditOpen(true)}
+            title="Modifier"
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-destructive hover:text-destructive"
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Supprimer"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+      )}
 
       {editOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

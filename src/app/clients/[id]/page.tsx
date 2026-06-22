@@ -3,11 +3,11 @@ import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency, formatDate } from "@/lib/utils";
 import { ClientInfoForm } from "./client-info-form";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import type { Client } from "@/lib/types";
+import type { Client, Conseiller, Operation } from "@/lib/types";
+import { ClientOperationsSection } from "@/components/clients/client-operations-section";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -22,6 +22,12 @@ export default async function ClientDetailPage({ params }: PageProps) {
     { data: operations },
     { data: conseillers },
     { data: assistantes },
+    { data: refStatuts },
+    { data: refOps },
+    { data: refProduits },
+    { data: refCompagnies },
+    { data: allClients },
+    { data: produitsStructures },
   ] = await Promise.all([
     supabase
       .from("clients")
@@ -30,16 +36,30 @@ export default async function ClientDetailPage({ params }: PageProps) {
       .single(),
     supabase
       .from("operations")
-      .select("id, date, type_operation, produit, compagnie, montant, statut")
+      .select("id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, date_facturation, created_by, assistante_id, created_at, updated_at, client_id, clients(nom, prenom)")
       .eq("client_id", id)
       .order("date", { ascending: false }),
-    supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
+    supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
     supabase
       .from("profiles")
       .select("id, full_name, email, role")
       .in("role", ["assistante_commerciale", "assistante_admin"])
       .order("full_name"),
+    supabase.from("ref_statuts").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("ref_operations").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("ref_produits").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
+    supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
   ]);
+
+  // Vérification rôle admin/responsable
+  const { data: { user } } = await supabase.auth.getUser();
+  let canManageRefs = false;
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    canManageRefs = profile?.role === "admin" || profile?.role === "responsable";
+  }
 
   if (clientError || !client) notFound();
 
@@ -88,56 +108,17 @@ export default async function ClientDetailPage({ params }: PageProps) {
         </Card>
 
         {/* Section Opérations */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Opérations ({(operations ?? []).length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {(operations ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground px-6 pb-4">
-                Aucune opération enregistrée pour ce client.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Type</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Produit</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Compagnie</th>
-                      <th className="text-right px-4 py-2 font-medium text-muted-foreground">Montant</th>
-                      <th className="text-left px-4 py-2 font-medium text-muted-foreground">Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(operations ?? []).map((op, i) => (
-                      <tr
-                        key={op.id}
-                        className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/10"}`}
-                      >
-                        <td className="px-4 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
-                        <td className="px-4 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
-                        <td className="px-4 py-2 whitespace-nowrap">{op.produit ?? "—"}</td>
-                        <td className="px-4 py-2 whitespace-nowrap">{op.compagnie ?? "—"}</td>
-                        <td className="px-4 py-2 text-right whitespace-nowrap font-medium">
-                          {formatCurrency(op.montant)}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          {op.statut ? (
-                            <Badge variant="outline">{op.statut}</Badge>
-                          ) : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <ClientOperationsSection
+          operations={(operations ?? []) as Operation[]}
+          clients={(allClients ?? []) as Client[]}
+          conseillers={(conseillers ?? []) as Conseiller[]}
+          typeOps={refOps ?? []}
+          produits={refProduits ?? []}
+          statuts={refStatuts ?? []}
+          compagnies={refCompagnies ?? []}
+          produitsStructures={produitsStructures ?? []}
+          canManageRefs={canManageRefs}
+        />
 
         {/* Section Bilans — masquée */}
       </div>

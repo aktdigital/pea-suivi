@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import type { Client, Conseiller } from "@/lib/types";
+import type { Client, Conseiller, Operation } from "@/lib/types";
 import { OperationFormButton } from "@/components/operations/operation-form";
 import { IsinOperationsTable, type IsinOperation } from "@/components/produits-structures/isin-operations-table";
+import { ModifierProduitDialog } from "@/components/produits-structures/modifier-produit-dialog";
 
 interface PageProps {
   params: Promise<{ isin: string }>;
@@ -52,6 +53,9 @@ export default async function ProduitDetailPage({ params }: PageProps) {
     { data: refCompagnies },
     { data: clients },
     { data: produitsStructures },
+    { data: refFrequences },
+    { data: refStructureurs },
+    { data: allForDistinct },
   ] = await Promise.all([
     supabase
       .from("produits_structures")
@@ -60,7 +64,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
       .single(),
     supabase
       .from("operations")
-      .select("id, date, type_operation, montant, collecte_type, conseiller_code, statut, compagnie, contrat, produit, isin, client_id, commentaire, date_facturation, clients(id, nom, prenom)")
+      .select("id, date, date_fin, type_operation, montant, collecte_type, conseiller_code, statut, compagnie, contrat, produit, isin, client_id, commentaire, date_facturation, support_type, validation, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_by, assistante_id, created_at, updated_at, clients(id, nom, prenom)")
       .eq("isin", decodedIsin)
       .order("date", { ascending: false }),
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
@@ -70,9 +74,22 @@ export default async function ProduitDetailPage({ params }: PageProps) {
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
     supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
+    supabase.from("ref_frequences").select("id, label, ordre").order("ordre"),
+    supabase.from("ref_structureurs").select("id, label, ordre, active").eq("active", true).order("ordre"),
+    supabase.from("produits_structures").select("mecanisme, duree, eligible_contrats").eq("active", true),
   ]);
 
   if (!produit) notFound();
+
+  // Listes pour le dialog de modification
+  function unique(arr: (string | null | undefined)[]): string[] {
+    return [...new Set(arr.filter((v): v is string => Boolean(v)))].sort();
+  }
+  const mecanismes = unique((allForDistinct ?? []).map((p) => p.mecanisme));
+  const durees = unique((allForDistinct ?? []).map((p) => p.duree));
+  const eligibleContrats = unique((allForDistinct ?? []).map((p) => p.eligible_contrats));
+  const structureurs = (refStructureurs ?? []).map((s) => s.label);
+  const frequences = (refFrequences ?? []).map((f) => f.label);
 
   // Calcul canManageRefs pour ce user
   const { data: { user } } = await supabase.auth.getUser();
@@ -135,17 +152,28 @@ export default async function ProduitDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            <OperationFormButton
-              clients={(clients ?? []) as Client[]}
-              conseillers={(conseillers ?? []) as Conseiller[]}
-              typeOps={refOps ?? []}
-              produits={refProduits ?? []}
-              statuts={refStatuts ?? []}
-              compagnies={refCompagnies ?? []}
-              produitsStructures={produitsStructures ?? []}
-              defaultIsin={decodedIsin}
-              canManageRefs={canManageRefs}
-            />
+            <div className="flex gap-2 flex-wrap">
+              <ModifierProduitDialog
+                produit={produit as import("@/lib/types").ProduitStructure}
+                mecanismes={mecanismes}
+                durees={durees}
+                frequences={frequences}
+                eligibleContrats={eligibleContrats}
+                compagnies={refCompagnies ?? []}
+                structureurs={structureurs}
+              />
+              <OperationFormButton
+                clients={(clients ?? []) as Client[]}
+                conseillers={(conseillers ?? []) as Conseiller[]}
+                typeOps={refOps ?? []}
+                produits={refProduits ?? []}
+                statuts={refStatuts ?? []}
+                compagnies={refCompagnies ?? []}
+                produitsStructures={produitsStructures ?? []}
+                defaultIsin={decodedIsin}
+                canManageRefs={canManageRefs}
+              />
+            </div>
           </div>
         </div>
 
@@ -258,6 +286,16 @@ export default async function ProduitDetailPage({ params }: PageProps) {
             totalNewCash={totalNewCash}
             totalEncours={totalEncours}
             restantAFaire={produit.restant_a_faire ?? null}
+            editRefs={{
+              clients: (clients ?? []) as Client[],
+              conseillers: (conseillers ?? []) as Conseiller[],
+              typeOps: refOps ?? [],
+              produits: refProduits ?? [],
+              statuts: refStatuts ?? [],
+              compagnies: refCompagnies ?? [],
+              produitsStructures: produitsStructures ?? [],
+              canManageRefs,
+            }}
           />
         </div>
       </div>

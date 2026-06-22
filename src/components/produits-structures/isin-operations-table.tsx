@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import type { Operation, Client, Conseiller } from "@/lib/types";
+import { OperationClickableRow } from "@/components/operations/operation-clickable-row";
 
 interface OpClient {
   id?: string | null;
@@ -10,21 +12,9 @@ interface OpClient {
   prenom: string | null;
 }
 
-export interface IsinOperation {
-  id: string;
-  date: string;
-  client_id: string | null;
-  produit: string | null;
-  compagnie: string | null;
-  contrat: string | null;
-  montant: number | null;
-  collecte_type: "new_cash" | "encours" | null;
-  conseiller_code: string | null;
-  statut: string | null;
-  commentaire: string | null;
-  date_facturation: string | null;
+export type IsinOperation = Operation & {
   clients?: OpClient | null;
-}
+};
 
 interface IsinOperationsTableProps {
   operations: IsinOperation[];
@@ -32,6 +22,17 @@ interface IsinOperationsTableProps {
   totalNewCash: number;
   totalEncours: number;
   restantAFaire: number | null;
+  // Référentiels pour la popup d'édition (optionnels : si absent, pas de clic)
+  editRefs?: {
+    clients: Client[];
+    conseillers: Conseiller[];
+    typeOps: { id: number; label: string }[];
+    produits: { id: number; label: string }[];
+    statuts: { id: number; label: string }[];
+    compagnies: { id: number; label: string }[];
+    produitsStructures: { isin: string; nom_produit: string }[];
+    canManageRefs: boolean;
+  };
 }
 
 const STATUTS_OFFICIELS = [
@@ -58,6 +59,7 @@ export function IsinOperationsTable({
   totalNewCash,
   totalEncours,
   restantAFaire,
+  editRefs,
 }: IsinOperationsTableProps) {
   if (operations.length === 0) {
     return (
@@ -118,13 +120,11 @@ export function IsinOperationsTable({
               const clientName = op.clients
                 ? `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()
                 : null;
-              return (
-                <tr
-                  key={op.id}
-                  className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`}
-                >
+              const rowClass = `border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`;
+              const cells = (
+                <>
                   <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">
+                  <td className="px-3 py-2 whitespace-nowrap" data-no-row-click>
                     {clientName && op.client_id ? (
                       <Link
                         href={`/clients/${op.client_id}`}
@@ -165,6 +165,32 @@ export function IsinOperationsTable({
                   <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
                     {formatDate(op.date_facturation)}
                   </td>
+                </>
+              );
+
+              if (editRefs) {
+                return (
+                  <OperationClickableRow
+                    key={op.id}
+                    operation={op}
+                    clients={editRefs.clients}
+                    conseillers={editRefs.conseillers}
+                    typeOps={editRefs.typeOps}
+                    produits={editRefs.produits}
+                    statuts={editRefs.statuts}
+                    compagnies={editRefs.compagnies}
+                    produitsStructures={editRefs.produitsStructures}
+                    canManageRefs={editRefs.canManageRefs}
+                    className={rowClass}
+                  >
+                    {cells}
+                  </OperationClickableRow>
+                );
+              }
+
+              return (
+                <tr key={op.id} className={rowClass}>
+                  {cells}
                 </tr>
               );
             })}

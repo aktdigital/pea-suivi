@@ -92,12 +92,25 @@ interface CaracteristiquesFieldsProps {
   onFrequenceChange: (v: string) => void;
   onEligibleChange: (v: string) => void;
   onStructureurChange: (v: string) => void;
+  // Valeurs par défaut optionnelles (mode édition)
+  defaultDateConstatation?: string;
+  defaultProtectionGain?: string;
+  defaultProtectionCapital?: string;
+  defaultDegressivite?: string;
+  defaultObjectifRendement?: string;
+  defaultUpfrontBrut?: string;
 }
 
 export function CaracteristiquesFields({
   mecanismes, durees, frequences, eligible, structureurs,
   selectedMecanisme, selectedDuree, selectedFrequence, selectedEligible, selectedStructureur,
   onMecanismeChange, onDureeChange, onFrequenceChange, onEligibleChange, onStructureurChange,
+  defaultDateConstatation = "",
+  defaultProtectionGain = "",
+  defaultProtectionCapital = "",
+  defaultDegressivite = "",
+  defaultObjectifRendement = "",
+  defaultUpfrontBrut = "",
 }: CaracteristiquesFieldsProps) {
   return (
     <div className="border-t border-pea-gray/20 pt-4 space-y-4">
@@ -121,7 +134,7 @@ export function CaracteristiquesFields({
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Date de constatation initiale</label>
-          <input type="date" name="date_constatation_initiale" className={inputClass} />
+          <input type="date" name="date_constatation_initiale" defaultValue={defaultDateConstatation} className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Fréquence rappel</label>
@@ -141,23 +154,23 @@ export function CaracteristiquesFields({
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Protection gain</label>
-          <input type="text" name="protection_gain" placeholder="Ex : 0.5 ou 50%" className={inputClass} />
+          <input type="text" name="protection_gain" defaultValue={defaultProtectionGain} placeholder="Ex : 0.5 ou 50%" className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Protection capital</label>
-          <input type="text" name="protection_capital" placeholder="Ex : 0.9 ou 90%" className={inputClass} />
+          <input type="text" name="protection_capital" defaultValue={defaultProtectionCapital} placeholder="Ex : 0.9 ou 90%" className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Dégressivité</label>
-          <input type="text" name="degressivite" placeholder="Description…" className={inputClass} />
+          <input type="text" name="degressivite" defaultValue={defaultDegressivite} placeholder="Description…" className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Objectif rendement</label>
-          <input type="text" name="objectif_rendement" placeholder="Ex : 0.07 ou 7%" className={inputClass} />
+          <input type="text" name="objectif_rendement" defaultValue={defaultObjectifRendement} placeholder="Ex : 0.07 ou 7%" className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Upfront brut</label>
-          <input type="text" name="upfront_brut" placeholder="Ex : 0.025 ou 2.5%" className={inputClass} />
+          <input type="text" name="upfront_brut" defaultValue={defaultUpfrontBrut} placeholder="Ex : 0.025 ou 2.5%" className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Structureur</label>
@@ -180,22 +193,32 @@ const MOIS_OPTIONS = [
   "Juillet 2026", "Août 2026", "Septembre 2026", "Octobre 2026", "Novembre 2026", "Décembre 2026",
 ];
 
-export function CommercialisationFields() {
+interface CommercialisationFieldsProps {
+  defaultDateFin?: string;
+  defaultEnveloppe?: string;
+  defaultMoisCreation?: string;
+}
+
+export function CommercialisationFields({
+  defaultDateFin = "",
+  defaultEnveloppe = "",
+  defaultMoisCreation = "",
+}: CommercialisationFieldsProps = {}) {
   return (
     <div className="border-t border-pea-gray/20 pt-4 space-y-4">
       <p className="text-xs uppercase tracking-wide text-pea-gray font-medium">Commercialisation</p>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <label className={labelClass}>Date fin commercialisation</label>
-          <input type="date" name="date_fin_commercialisation" className={inputClass} />
+          <input type="date" name="date_fin_commercialisation" defaultValue={defaultDateFin} className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Enveloppe réservée (€)</label>
-          <input type="number" name="enveloppe_reservee" step="1000" min="0" placeholder="0" className={inputClass} />
+          <input type="number" name="enveloppe_reservee" step="1000" min="0" defaultValue={defaultEnveloppe} placeholder="0" className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Mois création</label>
-          <select name="mois_creation" className={selectClass}>
+          <select name="mois_creation" defaultValue={defaultMoisCreation} className={selectClass}>
             <option value="">— Sélectionner —</option>
             {MOIS_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
