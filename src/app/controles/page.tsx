@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDate } from "@/lib/utils";
 import { ControleCell } from "@/components/controles/controle-cell";
 import { ControleFiltersClient } from "@/components/controles/controle-filters";
+import { ControleStatutsManager } from "@/components/controles/controle-statuts-manager";
 import { ShieldCheck } from "lucide-react";
 
 interface PageProps {
@@ -24,6 +25,14 @@ export default async function ControlesPage({ searchParams }: PageProps) {
   ]);
 
   const statuts = refStatutsControle ?? [];
+
+  // Rôle : Michèle (assistante_admin), Sonia (responsable), Piyanat (admin) peuvent gérer la liste de valeurs
+  const { data: { user } } = await supabase.auth.getUser();
+  let canManageControles = false;
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+    canManageControles = ["admin", "responsable", "assistante_admin"].includes(profile?.role ?? "");
+  }
 
   // Requête opérations avec jointure clients
   let query = supabase
@@ -82,6 +91,9 @@ export default async function ControlesPage({ searchParams }: PageProps) {
             </div>
           </div>
         </div>
+
+        {/* Gestion des valeurs de contrôle (admin / responsable / assistante_admin) */}
+        {canManageControles && <ControleStatutsManager statuts={statuts} />}
 
         {/* Filtres */}
         <Suspense>
