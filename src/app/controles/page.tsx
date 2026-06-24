@@ -48,7 +48,7 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
     const role = profile?.role ?? "";
     canManageControles = ["admin", "responsable", "assistante_admin"].includes(role);
-    canManageRefs = ["admin", "responsable"].includes(role);
+    canManageRefs = ["admin", "responsable", "assistante_admin"].includes(role);
   }
 
   // Requête opérations avec jointure clients

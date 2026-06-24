@@ -56,7 +56,7 @@ async function checkRole() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "admin" && profile?.role !== "responsable") {
+  if (profile?.role !== "admin" && profile?.role !== "responsable" && profile?.role !== "assistante_admin") {
     return { supabase: null, error: "Permission refusée : rôle insuffisant" as const };
   }
 

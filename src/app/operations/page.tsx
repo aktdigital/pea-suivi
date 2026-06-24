@@ -55,7 +55,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
   let canManageRefs = false;
   if (user) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    canManageRefs = profile?.role === "admin" || profile?.role === "responsable";
+    canManageRefs = profile?.role === "admin" || profile?.role === "responsable" || profile?.role === "assistante_admin";
   }
 
   // KPIs toujours sur le mois affiché (mois sélectionné ou mois courant par défaut)

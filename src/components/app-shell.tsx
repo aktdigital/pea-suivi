@@ -26,7 +26,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       .eq("id", user.id)
       .single();
     if (profile?.full_name) displayName = profile.full_name;
-    canManageRefs = profile?.role === "admin" || profile?.role === "responsable";
+    canManageRefs = profile?.role === "admin" || profile?.role === "responsable" || profile?.role === "assistante_admin";
   }
 
   return (

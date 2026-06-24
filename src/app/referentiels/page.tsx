@@ -22,7 +22,7 @@ export default async function ReferentielsPage() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "admin" && profile?.role !== "responsable") {
+  if (profile?.role !== "admin" && profile?.role !== "responsable" && profile?.role !== "assistante_admin") {
     redirect("/");
   }
 
