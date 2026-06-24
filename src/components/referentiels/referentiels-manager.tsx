@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { renameRef, toggleRefActive, addRef, saveRefOrder } from "@/app/referentiels/actions";
+import { renameRef, toggleRefActive, addRef, saveRefOrder, updateRefCode } from "@/app/referentiels/actions";
 
 // Types des lignes de chaque table
 interface RefRow {
@@ -39,13 +39,14 @@ type TabDef = {
   label: string;
   table: string;
   hasActive: boolean;
+  hasCode?: boolean;
   readonlyFields?: string[];
 };
 
 const TABS: TabDef[] = [
   { key: "compagnies", label: "Compagnies", table: "ref_compagnies", hasActive: true },
   { key: "produits", label: "Produits", table: "ref_produits", hasActive: true },
-  { key: "operations", label: "Opérations", table: "ref_operations", hasActive: true, readonlyFields: ["code"] },
+  { key: "operations", label: "Opérations", table: "ref_operations", hasActive: true, hasCode: true },
   { key: "statuts", label: "Statuts", table: "ref_statuts", hasActive: true, readonlyFields: ["is_final"] },
   { key: "supports", label: "Supports", table: "ref_supports", hasActive: true },
   { key: "structureurs", label: "Structureurs", table: "ref_structureurs", hasActive: true },
@@ -56,14 +57,19 @@ interface RefListProps {
   table: string;
   initialRows: RefRow[];
   hasActive: boolean;
+  hasCode?: boolean;
   readonlyFields?: string[];
 }
 
-function RefList({ table, initialRows, hasActive, readonlyFields = [] }: RefListProps) {
+function RefList({ table, initialRows, hasActive, hasCode = false, readonlyFields = [] }: RefListProps) {
   const [rows, setRows] = useState<RefRow[]>(initialRows);
   const [labels, setLabels] = useState<Record<number, string>>(
     Object.fromEntries(initialRows.map((r) => [r.id, r.label]))
   );
+  const [codes, setCodes] = useState<Record<number, string>>(
+    Object.fromEntries(initialRows.map((r) => [r.id, r.code ?? ""]))
+  );
+  const [savingCode, setSavingCode] = useState<Record<number, boolean>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
   const [toggling, setToggling] = useState<Record<number, boolean>>({});
   const [movePending, startMoveTransition] = useTransition();
@@ -94,6 +100,19 @@ function RefList({ table, initialRows, hasActive, readonlyFields = [] }: RefList
     } else {
       // Mise à jour locale du label
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, label: label.trim() } : r)));
+    }
+  }
+
+  async function handleSaveCode(id: number) {
+    clearError(id);
+    const code = codes[id] ?? "";
+    setSavingCode((p) => ({ ...p, [id]: true }));
+    const result = await updateRefCode(table, id, code);
+    setSavingCode((p) => ({ ...p, [id]: false }));
+    if (result.error) {
+      setError(id, result.error);
+    } else {
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, code: code.trim() || null } : r)));
     }
   }
 
@@ -157,8 +176,8 @@ function RefList({ table, initialRows, hasActive, readonlyFields = [] }: RefList
             <tr className="bg-pea-blue/5 border-b border-pea-gray/20">
               <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs w-8">#</th>
               <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs">Libellé</th>
-              {readonlyFields.includes("code") && (
-                <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs w-24">Code</th>
+              {hasCode && (
+                <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs w-36">Code</th>
               )}
               {readonlyFields.includes("is_final") && (
                 <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs w-20">Final</th>
@@ -204,15 +223,30 @@ function RefList({ table, initialRows, hasActive, readonlyFields = [] }: RefList
                     <p className="text-xs text-destructive mt-1">{errors[row.id]}</p>
                   )}
                 </td>
-                {readonlyFields.includes("code") && (
+                {hasCode && (
                   <td className="px-3 py-2">
-                    {row.code ? (
-                      <Badge variant="secondary" className="text-xs font-mono">
-                        {row.code}
-                      </Badge>
-                    ) : (
-                      <span className="text-pea-gray/40">—</span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      <Input
+                        value={codes[row.id] ?? ""}
+                        onChange={(e) => {
+                          setCodes((prev) => ({ ...prev, [row.id]: e.target.value }));
+                          clearError(row.id);
+                        }}
+                        placeholder="—"
+                        className="h-7 w-20 text-xs font-mono"
+                        disabled={savingCode[row.id]}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs shrink-0"
+                        onClick={() => handleSaveCode(row.id)}
+                        disabled={savingCode[row.id]}
+                        title="Enregistrer le code"
+                      >
+                        {savingCode[row.id] ? "…" : "OK"}
+                      </Button>
+                    </div>
                   </td>
                 )}
                 {readonlyFields.includes("is_final") && (
@@ -270,7 +304,7 @@ function RefList({ table, initialRows, hasActive, readonlyFields = [] }: RefList
             {rows.length === 0 && (
               <tr>
                 <td
-                  colSpan={5 + (hasActive ? 1 : 0) + readonlyFields.length}
+                  colSpan={4 + (hasActive ? 1 : 0) + (hasCode ? 1 : 0) + readonlyFields.length}
                   className="px-3 py-6 text-center text-sm text-pea-gray/60"
                 >
                   Aucune valeur.
@@ -316,10 +350,10 @@ export function ReferentielsManager({
   structureurs,
   frequences,
 }: ReferentielsManagerProps) {
-  const dataMap: Record<string, { rows: RefRow[]; hasActive: boolean; readonlyFields?: string[] }> = {
+  const dataMap: Record<string, { rows: RefRow[]; hasActive: boolean; hasCode?: boolean; readonlyFields?: string[] }> = {
     compagnies: { rows: compagnies, hasActive: true },
     produits: { rows: produits, hasActive: true },
-    operations: { rows: operations, hasActive: true, readonlyFields: ["code"] },
+    operations: { rows: operations, hasActive: true, hasCode: true },
     statuts: { rows: statuts, hasActive: true, readonlyFields: ["is_final"] },
     supports: { rows: supports, hasActive: true },
     structureurs: { rows: structureurs, hasActive: true },
@@ -347,6 +381,7 @@ export function ReferentielsManager({
               table={tab.table}
               initialRows={data.rows}
               hasActive={data.hasActive}
+              hasCode={data.hasCode}
               readonlyFields={data.readonlyFields ?? []}
             />
           </TabsContent>

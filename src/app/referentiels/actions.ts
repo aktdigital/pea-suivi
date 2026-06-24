@@ -24,8 +24,12 @@ const ACTIVABLE_TABLES = [
   "ref_structureurs",
 ] as const;
 
+// Tables qui ont une colonne `code` éditable
+const CODE_TABLES = ["ref_operations"] as const;
+
 type AllowedTable = (typeof ALLOWED_TABLES)[number];
 type ActivableTable = (typeof ACTIVABLE_TABLES)[number];
+type CodeTable = (typeof CODE_TABLES)[number];
 
 function isAllowedTable(table: string): table is AllowedTable {
   return (ALLOWED_TABLES as readonly string[]).includes(table);
@@ -33,6 +37,10 @@ function isAllowedTable(table: string): table is AllowedTable {
 
 function isActivableTable(table: string): table is ActivableTable {
   return (ACTIVABLE_TABLES as readonly string[]).includes(table);
+}
+
+function isCodeTable(table: string): table is CodeTable {
+  return (CODE_TABLES as readonly string[]).includes(table);
 }
 
 async function checkRole() {
@@ -95,6 +103,30 @@ export async function toggleRefActive(
   const { error } = await supabase
     .from(table)
     .update({ active })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/referentiels");
+  return {};
+}
+
+// Renseigne / modifie le code (uniquement les tables qui ont une colonne `code`)
+export async function updateRefCode(
+  table: string,
+  id: number,
+  code: string
+): Promise<{ error?: string }> {
+  const { supabase, error: roleError } = await checkRole();
+  if (roleError || !supabase) return { error: roleError ?? "Erreur" };
+
+  if (!isAllowedTable(table)) return { error: "Table non autorisée" };
+  if (!isCodeTable(table)) return { error: "Cette table n'a pas de code" };
+
+  const trimmed = code.trim();
+  const { error } = await supabase
+    .from(table)
+    .update({ code: trimmed || null })
     .eq("id", id);
 
   if (error) return { error: error.message };
