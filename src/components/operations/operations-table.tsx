@@ -53,7 +53,7 @@ export async function OperationsTable({
   let query = supabase
     .from("operations")
     .select(`
-      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
+      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, devoir_conseil, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
       clients(nom, prenom),
       created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
     `)
@@ -134,6 +134,7 @@ export async function OperationsTable({
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Support</th>
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">ISIN</th>
             <th className="text-center px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Validé</th>
+            <th className="text-center px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Devoir conseil</th>
             <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Commentaire</th>
             <th className="px-3 py-2"></th>
           </tr>

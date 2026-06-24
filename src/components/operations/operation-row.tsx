@@ -125,6 +125,13 @@ export function OperationRow({
           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-gray/15 text-pea-gray text-xs">—</span>
         )}
       </td>
+      <td className="px-3 py-2 text-center">
+        {op.devoir_conseil ? (
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-teal/15 text-pea-teal text-xs">✓</span>
+        ) : (
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-gray/15 text-pea-gray text-xs">—</span>
+        )}
+      </td>
       <td className="px-3 py-2 max-w-[150px]">
         <span className="block truncate text-xs text-muted-foreground" title={op.commentaire ?? ""}>
           {op.commentaire ?? "—"}
