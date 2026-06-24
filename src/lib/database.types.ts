@@ -231,6 +231,7 @@ export type Database = {
           date_debut: string | null
           date_facturation: string | null
           date_fin: string | null
+          devoir_conseil: boolean
           id: string
           isin: string | null
           lettre_mission: string | null
@@ -260,6 +261,7 @@ export type Database = {
           date_debut?: string | null
           date_facturation?: string | null
           date_fin?: string | null
+          devoir_conseil?: boolean
           id?: string
           isin?: string | null
           lettre_mission?: string | null
@@ -289,6 +291,7 @@ export type Database = {
           date_debut?: string | null
           date_facturation?: string | null
           date_fin?: string | null
+          devoir_conseil?: boolean
           id?: string
           isin?: string | null
           lettre_mission?: string | null

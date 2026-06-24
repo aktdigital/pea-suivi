@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { updateClientInfo } from "./actions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { updateClientInfo, deleteClient } from "./actions";
 import type { Client } from "@/lib/types";
 
 interface Conseiller {
@@ -22,12 +30,27 @@ interface ClientInfoFormProps {
   client: Client;
   conseillers: Conseiller[];
   assistantes: Assistante[];
+  operationsCount: number;
 }
 
-export function ClientInfoForm({ client, conseillers, assistantes }: ClientInfoFormProps) {
+export function ClientInfoForm({ client, conseillers, assistantes, operationsCount }: ClientInfoFormProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await deleteClient(client.id);
+    // En cas de succès, deleteClient redirige (la promesse ne résout pas ici).
+    if (result?.error) {
+      setDeleteError(result.error);
+      setDeleting(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -35,6 +58,8 @@ export function ClientInfoForm({ client, conseillers, assistantes }: ClientInfoF
     setError(null);
     const fd = new FormData(e.currentTarget);
     const result = await updateClientInfo(client.id, {
+      nom: String(fd.get("nom") || ""),
+      prenom: String(fd.get("prenom") || ""),
       email: String(fd.get("email") || ""),
       telephone: String(fd.get("telephone") || ""),
       notes: String(fd.get("notes") || ""),
@@ -101,6 +126,14 @@ export function ClientInfoForm({ client, conseillers, assistantes }: ClientInfoF
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
+          <label className="text-sm font-medium">Nom</label>
+          <Input type="text" name="nom" defaultValue={client.nom ?? ""} required />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Prénom</label>
+          <Input type="text" name="prenom" defaultValue={client.prenom ?? ""} />
+        </div>
+        <div className="space-y-1">
           <label className="text-sm font-medium">Conseiller</label>
           <select
             name="conseiller_code"
@@ -157,7 +190,57 @@ export function ClientInfoForm({ client, conseillers, assistantes }: ClientInfoF
         <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
           Annuler
         </Button>
+        <Button
+          type="button"
+          variant="destructive"
+          size="sm"
+          className="ml-auto"
+          onClick={() => setConfirmOpen(true)}
+        >
+          Supprimer
+        </Button>
       </div>
+
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!deleting) setConfirmOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer ce client ?</DialogTitle>
+            <DialogDescription>
+              {client.nom} {client.prenom ?? ""} sera supprimé définitivement
+              {operationsCount > 0
+                ? `, ainsi que ses ${operationsCount} opération${operationsCount > 1 ? "s" : ""} liée${operationsCount > 1 ? "s" : ""}`
+                : ""}
+              . Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={deleting}
+              onClick={() => setConfirmOpen(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={deleting}
+              onClick={handleDelete}
+            >
+              {deleting ? "Suppression…" : "Supprimer définitivement"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }

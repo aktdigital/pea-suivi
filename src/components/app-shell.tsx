@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, ListChecks, Users, LogOut, Layers, TrendingUp, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, ListChecks, Users, LogOut, Layers, TrendingUp, ShieldCheck, BookOpen } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/server";
 
@@ -18,6 +18,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
   const { data: { user } } = await supabase.auth.getUser();
 
   let displayName = user?.email ?? "";
+  let canManageRefs = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
@@ -25,6 +26,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
       .eq("id", user.id)
       .single();
     if (profile?.full_name) displayName = profile.full_name;
+    canManageRefs = profile?.role === "admin" || profile?.role === "responsable";
   }
 
   return (
@@ -56,6 +58,15 @@ export default async function AppShell({ children }: { children: React.ReactNode
               <span className="truncate">{item.label}</span>
             </Link>
           ))}
+          {canManageRefs && (
+            <Link
+              href="/referentiels"
+              className="group flex items-center gap-3 px-3 py-2.5 text-sm rounded-md transition-colors text-white/80 hover:text-white"
+            >
+              <BookOpen className="size-4 shrink-0" style={{ color: "#3bb6ac" }} />
+              <span className="truncate">Référentiels</span>
+            </Link>
+          )}
         </nav>
 
         {/* Footer */}

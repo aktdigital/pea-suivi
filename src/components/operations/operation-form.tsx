@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createOperation, addRefValue } from "@/app/operations/actions";
+import { createOperation, createOperationsMulti, addRefValue } from "@/app/operations/actions";
 import type { OperationFormData } from "@/app/operations/actions";
 import type { Client, Conseiller } from "@/lib/types";
 import { OperationFormInner } from "./operation-form-inner";
@@ -72,10 +72,27 @@ export function OperationFormButton({
       support_type: String(fd.get("support_type") || ""),
       isin: String(fd.get("isin") || ""),
       validation: fd.get("validation") === "on",
+      devoir_conseil: fd.get("devoir_conseil") === "on",
       commentaire: String(fd.get("commentaire") || ""),
       date_facturation: String(fd.get("date_facturation") || ""),
     };
-    const result = await createOperation(data);
+    // Option B : fonds supplémentaires saisis → on crée une opération par (isin, montant)
+    const extraIsins = fd.getAll("extra_isin").map((v) => String(v).trim());
+    const extraMontants = fd.getAll("extra_montant").map((v) => String(v).trim());
+    const extras = extraIsins
+      .map((isin, i) => ({ isin, montant: extraMontants[i] ?? "" }))
+      .filter((f) => f.isin !== "" || f.montant !== "");
+
+    let result;
+    if (extras.length > 0) {
+      const { isin, montant, ...common } = data;
+      const fonds = [{ isin: isin.trim(), montant: montant.trim() }, ...extras].filter(
+        (f) => f.isin !== "" || f.montant !== ""
+      );
+      result = await createOperationsMulti(common, fonds);
+    } else {
+      result = await createOperation(data);
+    }
     setSaving(false);
     if (result?.error) {
       setError(result.error);
@@ -119,6 +136,7 @@ export function OperationFormButton({
               canManageRefs={canManageRefs}
               onAddRef={handleAddRef}
               submitLabel="Créer l'opération"
+              allowMultiIsin
             />
           </div>
         </div>

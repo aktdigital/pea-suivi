@@ -101,6 +101,7 @@ export function OperationRowActions({
       support_type: String(fd.get("support_type") || ""),
       isin: String(fd.get("isin") || ""),
       validation: fd.get("validation") === "on",
+      devoir_conseil: fd.get("devoir_conseil") === "on",
       commentaire: String(fd.get("commentaire") || ""),
       courrier_pea: String(fd.get("courrier_pea") || "a_faire"),
       lettre_mission: String(fd.get("lettre_mission") || "a_faire"),

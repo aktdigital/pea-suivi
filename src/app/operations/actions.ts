@@ -20,6 +20,7 @@ export type OperationFormData = {
   support_type: string;
   isin: string;
   validation: boolean;
+  devoir_conseil: boolean;
   commentaire: string;
   courrier_pea?: string;
   lettre_mission?: string;
@@ -45,6 +46,7 @@ export async function createOperation(formData: OperationFormData) {
     support_type: formData.support_type || null,
     isin: formData.isin || null,
     validation: formData.validation ?? false,
+    devoir_conseil: formData.devoir_conseil ?? false,
     commentaire: formData.commentaire || null,
     date_facturation: formData.date_facturation || null,
     created_by: user?.id ?? null,
@@ -58,6 +60,50 @@ export async function createOperation(formData: OperationFormData) {
   revalidatePath("/operations");
   revalidatePath("/");
   return { success: true };
+}
+
+/**
+ * Option B (opération multi-fonds) : crée N opérations partageant les MÊMES champs
+ * communs, une par couple (isin, montant). Évite de re-saisir X lignes pour un
+ * arbitrage sur plusieurs fonds. Le modèle reste 1 ISIN/opération (analytique par
+ * produit intacte) — on automatise juste la création des lignes.
+ */
+export async function createOperationsMulti(
+  common: Omit<OperationFormData, "isin" | "montant">,
+  fonds: { isin: string; montant: string }[]
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!fonds.length) return { error: "Aucun fonds renseigné." };
+
+  const rows = fonds.map((f) => ({
+    date: common.date,
+    client_id: common.client_id || null,
+    type_operation: common.type_operation || null,
+    produit: common.produit || null,
+    compagnie: common.compagnie || null,
+    contrat: common.contrat || null,
+    montant: f.montant ? parseFloat(f.montant) : null,
+    collecte_type: common.collecte_type || null,
+    conseiller_code: common.conseiller_code || null,
+    statut: common.statut || null,
+    support_type: common.support_type || null,
+    isin: f.isin || null,
+    validation: common.validation ?? false,
+    devoir_conseil: common.devoir_conseil ?? false,
+    commentaire: common.commentaire || null,
+    date_facturation: common.date_facturation || null,
+    created_by: user?.id ?? null,
+    assistante_id: user?.id ?? null,
+  }));
+
+  const { error } = await supabase.from("operations").insert(rows);
+  if (error) return { error: error.message };
+
+  revalidatePath("/operations");
+  revalidatePath("/");
+  return { success: true, count: rows.length };
 }
 
 export async function updateOperation(id: string, formData: OperationFormData) {
@@ -90,6 +136,7 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     support_type: formData.support_type || null,
     isin: formData.isin || null,
     validation: formData.validation ?? false,
+    devoir_conseil: formData.devoir_conseil ?? false,
     commentaire: formData.commentaire || null,
     date_facturation: formData.date_facturation || null,
     updated_at: new Date().toISOString(),

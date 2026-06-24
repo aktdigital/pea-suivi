@@ -68,6 +68,7 @@ export interface Operation {
   controle_at: string | null;
   date_fin: string | null;
   date_facturation: string | null;
+  devoir_conseil?: boolean;
 }
 
 export type StatutControle = "a_faire" | "so" | "en_attente_avenants" | "en_cours_compagnie" | "valide" | "ok";

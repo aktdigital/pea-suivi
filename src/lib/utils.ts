@@ -28,3 +28,7 @@ export const MOIS = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
+
+export function isRachat(typeOperation: string | null | undefined): boolean {
+  return /rachat/i.test(typeOperation ?? "");
+}

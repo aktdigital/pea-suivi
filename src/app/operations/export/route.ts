@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { serializeCsv, formatDateCsv, formatMontantCsv, formatBoolCsv } from "@/lib/csv";
+import { fetchAllRows } from "@/lib/supabase/paginate";
 
 export const dynamic = "force-dynamic";
 
@@ -23,51 +24,6 @@ export async function GET(request: NextRequest) {
   const moisEffectif = mois;
 
   const supabase = await createClient();
-
-  // Requête principale — réplique exactement operations-table.tsx
-  let query = supabase
-    .from("operations")
-    .select(`
-      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
-      clients(nom, prenom),
-      created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
-    `)
-    .order("date", { ascending: false });
-
-  if (moisEffectif) {
-    const [year, month] = moisEffectif.split("-");
-    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-    query = query
-      .gte("date", `${year}-${month}-01`)
-      .lte("date", `${year}-${month}-${lastDay}`);
-  }
-
-  if (conseiller) query = query.eq("conseiller_code", conseiller);
-  if (statut) query = query.eq("statut", statut);
-  if (type) query = query.eq("type_operation", type);
-  if (par) query = query.eq("created_by", par);
-  if (isin) query = query.ilike("isin", `%${isin}%`);
-  if (compagnie) query = query.eq("compagnie", compagnie);
-  if (assistante) query = query.eq("assistante_id", assistante);
-  if (support) query = query.eq("support_type", support);
-  if (contrat) query = query.ilike("contrat", `%${contrat}%`);
-
-  // Chargement référentiels en parallèle
-  const [{ data: operations }, { data: conseillers }, { data: refStatutsControle }] = await Promise.all([
-    query,
-    supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
-    supabase.from("ref_statuts_controle").select("code, label").order("ordre"),
-  ]);
-
-  const conseillerMap: Record<string, string> = {};
-  for (const c of conseillers ?? []) {
-    conseillerMap[c.code] = c.full_name;
-  }
-
-  const controleMap: Record<string, string> = {};
-  for (const s of refStatutsControle ?? []) {
-    controleMap[s.code] = s.label;
-  }
 
   type OpRow = {
     id: string;
@@ -93,7 +49,53 @@ export async function GET(request: NextRequest) {
     created_by_profile?: { id: string; full_name: string | null; email: string | null } | null;
   };
 
-  let filtered: OpRow[] = (operations ?? []) as OpRow[];
+  // Pagination obligatoire (plafond PostgREST 1000) : on reconstruit la requête —
+  // filtres identiques à operations-table.tsx — pour chaque page via .range().
+  const [operations, { data: conseillers }, { data: refStatutsControle }] = await Promise.all([
+    fetchAllRows<OpRow>((from, to) => {
+      let page = supabase
+        .from("operations")
+        .select(`
+      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
+      clients(nom, prenom),
+      created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
+    `);
+      if (moisEffectif) {
+        const [year, month] = moisEffectif.split("-");
+        const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+        page = page
+          .gte("date", `${year}-${month}-01`)
+          .lte("date", `${year}-${month}-${lastDay}`);
+      }
+      if (conseiller) page = page.eq("conseiller_code", conseiller);
+      if (statut) page = page.eq("statut", statut);
+      if (type) page = page.eq("type_operation", type);
+      if (par) page = page.eq("created_by", par);
+      if (isin) page = page.ilike("isin", `%${isin}%`);
+      if (compagnie) page = page.eq("compagnie", compagnie);
+      if (assistante) page = page.eq("assistante_id", assistante);
+      if (support) page = page.eq("support_type", support);
+      if (contrat) page = page.ilike("contrat", `%${contrat}%`);
+      return page.order("date", { ascending: false }).range(from, to) as unknown as PromiseLike<{
+        data: OpRow[] | null;
+        error: { message: string } | null;
+      }>;
+    }),
+    supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
+    supabase.from("ref_statuts_controle").select("code, label").order("ordre"),
+  ]);
+
+  const conseillerMap: Record<string, string> = {};
+  for (const c of conseillers ?? []) {
+    conseillerMap[c.code] = c.full_name;
+  }
+
+  const controleMap: Record<string, string> = {};
+  for (const s of refStatutsControle ?? []) {
+    controleMap[s.code] = s.label;
+  }
+
+  let filtered: OpRow[] = operations;
 
   // Filtre q en mémoire — identique à operations-table.tsx
   if (q) {

@@ -103,7 +103,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
             <CardTitle className="text-base">Informations</CardTitle>
           </CardHeader>
           <CardContent>
-            <ClientInfoForm client={typedClient} conseillers={conseillers ?? []} assistantes={assistantes ?? []} />
+            <ClientInfoForm client={typedClient} conseillers={conseillers ?? []} assistantes={assistantes ?? []} operationsCount={operations?.length ?? 0} />
           </CardContent>
         </Card>
 

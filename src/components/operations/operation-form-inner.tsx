@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useRef } from "react";
 import type { Operation, Client, Conseiller, StatutControle } from "@/lib/types";
 import { STATUTS_CONTROLE } from "@/lib/types";
 
@@ -24,6 +24,8 @@ export interface OperationFormInnerProps {
   canManageRefs?: boolean;
   onAddRef?: (kind: "compagnie" | "type", label: string) => Promise<string | null>;
   submitLabel?: string;
+  /** Active la saisie multi-fonds (plusieurs ISIN sur une même saisie) — création uniquement. */
+  allowMultiIsin?: boolean;
 }
 
 function AddRefInline({
@@ -100,6 +102,7 @@ export function OperationFormInner({
   canManageRefs = false,
   onAddRef,
   submitLabel = "Enregistrer",
+  allowMultiIsin = false,
 }: OperationFormInnerProps) {
   const today = new Date().toISOString().split("T")[0];
   // Local copies so newly added values appear immediately in the select
@@ -107,6 +110,28 @@ export function OperationFormInner({
   const [localCompagnies, setLocalCompagnies] = useState(compagnies);
   const [typeOpValue, setTypeOpValue] = useState(defaultValues?.type_operation ?? "");
   const [compagnieValue, setCompagnieValue] = useState(defaultValues?.compagnie ?? "");
+
+  // Option B : fonds supplémentaires (création multi-ISIN). Chaque ligne => une opération.
+  const [extraFonds, setExtraFonds] = useState<number[]>([]);
+  const fondsKeyRef = useRef(0);
+  function addFonds() {
+    fondsKeyRef.current += 1;
+    setExtraFonds((prev) => [...prev, fondsKeyRef.current]);
+  }
+  function removeFonds(key: number) {
+    setExtraFonds((prev) => prev.filter((k) => k !== key));
+  }
+
+  // Tâche B : Nortia en premier, puis alphabétique dans chaque groupe
+  const sortedCompagnies = useMemo(() => {
+    return [...localCompagnies].sort((a, b) => {
+      const aNortia = /nortia/i.test(a.label);
+      const bNortia = /nortia/i.test(b.label);
+      if (aNortia && !bNortia) return -1;
+      if (!aNortia && bNortia) return 1;
+      return a.label.localeCompare(b.label, "fr", { sensitivity: "base" });
+    });
+  }, [localCompagnies]);
 
   async function handleAddCompagnie(label: string) {
     if (!onAddRef) return;
@@ -193,7 +218,7 @@ export function OperationFormInner({
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
           >
             <option value="">— Sélectionner —</option>
-            {localCompagnies.map((c) => <option key={c.id} value={c.label}>{c.label}</option>)}
+            {sortedCompagnies.map((c) => <option key={c.id} value={c.label}>{c.label}</option>)}
           </select>
           {canManageRefs && onAddRef && (
             <AddRefInline kind="compagnie" onAdd={handleAddCompagnie} />
@@ -278,6 +303,54 @@ export function OperationFormInner({
         </div>
       </div>
 
+      {allowMultiIsin && (
+        <div className="rounded-md border border-pea-gray/30 bg-pea-cream/40 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Autres fonds (même opération)</p>
+            <button type="button" onClick={addFonds} className="text-xs text-pea-teal hover:underline">
+              + Ajouter un fonds
+            </button>
+          </div>
+          {extraFonds.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Arbitrage sur plusieurs fonds ? Le 1ᵉʳ fonds = le Code ISIN + Montant ci-dessus.
+              Ajoute ici un ISIN et un montant par fonds supplémentaire : chacun créera une ligne
+              d&apos;opération avec les mêmes informations communes.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {extraFonds.map((key) => (
+                <div key={key} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    name="extra_isin"
+                    list="isin-list"
+                    placeholder="Code ISIN…"
+                    className="flex h-8 flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <input
+                    type="number"
+                    name="extra_montant"
+                    step="0.01"
+                    min="0"
+                    placeholder="Montant (€)"
+                    className="flex h-8 w-36 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeFonds(key)}
+                    className="text-pea-rust text-sm px-2"
+                    aria-label="Retirer ce fonds"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-6">
         <div className="space-y-1">
           <label className="text-sm font-medium">Collecte</label>
@@ -322,6 +395,20 @@ export function OperationFormInner({
               className="h-4 w-4 rounded border border-input accent-primary cursor-pointer"
             />
             <label htmlFor="edit-validation" className="text-sm cursor-pointer">Validé</label>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Devoir de conseil</label>
+          <div className="flex items-center gap-2 h-9">
+            <input
+              type="checkbox"
+              name="devoir_conseil"
+              id="edit-devoir-conseil"
+              defaultChecked={defaultValues?.devoir_conseil ?? false}
+              className="h-4 w-4 rounded border border-input accent-primary cursor-pointer"
+            />
+            <label htmlFor="edit-devoir-conseil" className="text-sm cursor-pointer">Réalisé</label>
           </div>
         </div>
       </div>

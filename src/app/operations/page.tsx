@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import AppShell from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, isRachat } from "@/lib/utils";
 import { OperationsFilters } from "@/components/operations/operations-filters";
 import { OperationsTable } from "@/components/operations/operations-table";
 import { OperationFormButton } from "@/components/operations/operation-form";
@@ -64,7 +64,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
 
   let kpiQuery = supabase
     .from("operations")
-    .select("montant, collecte_type, statut, conseiller_code")
+    .select("montant, collecte_type, statut, conseiller_code, type_operation")
     .gte("date", `${year}-${month}-01`)
     .lte("date", `${year}-${month}-${lastDay}`);
 
@@ -78,7 +78,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     .reduce((acc, op) => acc + (op.montant ?? 0), 0) ?? 0;
   const totalEncours = kpiData
     ?.filter((op) => op.collecte_type === "encours")
-    .reduce((acc, op) => acc + (op.montant ?? 0), 0) ?? 0;
+    .reduce((acc, op) => acc + (isRachat(op.type_operation) ? -1 : 1) * (op.montant ?? 0), 0) ?? 0;
   // Opérations en cours = non validées (statut ne contient pas "Validé, avenant récupéré")
   const nbEnCours = kpiData?.filter((op) => !op.statut?.toLowerCase().includes("récupéré")).length ?? 0;
 

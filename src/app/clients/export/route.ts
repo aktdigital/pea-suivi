@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { serializeCsv, formatDateCsv } from "@/lib/csv";
+import { fetchAllRows } from "@/lib/supabase/paginate";
 
 export const dynamic = "force-dynamic";
 
@@ -11,35 +12,41 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // Requête principale sans pagination — tous les clients filtrés
-  let clientQuery = supabase
-    .from("clients")
-    .select("id, civilite, nom, prenom, type_personne, conseiller_code, assistante_profile_id")
-    .order("nom");
+  type ClientRow = {
+    id: string;
+    civilite: string | null;
+    nom: string | null;
+    prenom: string | null;
+    type_personne: string | null;
+    conseiller_code: string | null;
+    assistante_profile_id: string | null;
+  };
 
-  if (conseiller) {
-    clientQuery = clientQuery.eq("conseiller_code", conseiller);
-  }
-  if (q) {
-    clientQuery = clientQuery.or(`nom.ilike.%${q}%,prenom.ilike.%${q}%`);
-  }
-
-  // La table operations est petite : on charge tous les client_id une fois et on
-  // agrège, plutôt qu'un .in() sur ~900 UUID (URL PostgREST trop longue / rejetée).
-  const [{ data: clients }, { data: conseillers }, { data: assistantesData }, { data: opsCounts }] = await Promise.all([
-    clientQuery,
+  // Pagination obligatoire : sans .range() en boucle, PostgREST plafonne à 1000
+  // lignes (l'export s'arrêtait au 1000e client, ~lettre T). On agrège les ops en
+  // mémoire plutôt qu'un .in() sur ~900 UUID (URL PostgREST trop longue / rejetée).
+  const [clientList, { data: conseillers }, { data: assistantesData }, opsCounts] = await Promise.all([
+    fetchAllRows<ClientRow>((from, to) => {
+      let page = supabase
+        .from("clients")
+        .select("id, civilite, nom, prenom, type_personne, conseiller_code, assistante_profile_id");
+      if (conseiller) page = page.eq("conseiller_code", conseiller);
+      if (q) page = page.or(`nom.ilike.%${q}%,prenom.ilike.%${q}%`);
+      return page.order("nom").range(from, to);
+    }),
     supabase.from("conseillers").select("code, full_name").eq("active", true).order("code"),
     supabase
       .from("profiles")
       .select("id, full_name, email, role")
       .in("role", ["assistante_commerciale", "assistante_admin"]),
-    supabase.from("operations").select("client_id"),
+    // operations peut dépasser 1000 lignes → pagination aussi, sinon "Nb opérations" faux.
+    fetchAllRows<{ client_id: string | null }>((from, to) =>
+      supabase.from("operations").select("client_id").range(from, to)
+    ),
   ]);
 
-  const clientList = clients ?? [];
-
   const countMap: Record<string, number> = {};
-  for (const op of opsCounts ?? []) {
+  for (const op of opsCounts) {
     if (op.client_id) {
       countMap[op.client_id] = (countMap[op.client_id] ?? 0) + 1;
     }

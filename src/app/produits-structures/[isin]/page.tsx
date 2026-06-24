@@ -4,7 +4,7 @@ import AppShell from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, isRachat } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import type { Client, Conseiller, Operation } from "@/lib/types";
 import { OperationFormButton } from "@/components/operations/operation-form";
@@ -111,7 +111,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
     .reduce((acc, op) => acc + (op.montant ?? 0), 0);
   const totalEncours = (operations ?? [])
     .filter((op) => op.collecte_type === "encours")
-    .reduce((acc, op) => acc + (op.montant ?? 0), 0);
+    .reduce((acc, op) => acc + (isRachat(op.type_operation) ? -1 : 1) * (op.montant ?? 0), 0);
   const totalMontant = (operations ?? []).reduce((acc, op) => acc + (op.montant ?? 0), 0);
 
   return (
