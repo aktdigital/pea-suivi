@@ -134,7 +134,7 @@ export function CaracteristiquesFields({
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Date de constatation initiale</label>
-          <input type="date" name="date_constatation_initiale" defaultValue={defaultDateConstatation} className={inputClass} />
+          <input type="text" name="date_constatation_initiale" defaultValue={defaultDateConstatation} placeholder="ex. Best strike du 23/01 et du 30/03/2026" className={inputClass} />
         </div>
         <div className="space-y-1">
           <label className={labelClass}>Fréquence rappel</label>

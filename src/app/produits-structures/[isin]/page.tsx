@@ -222,7 +222,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
                 <Row label="Sous-jacent" value={produit.sous_jacent} />
                 <Row label="Mécanisme" value={produit.mecanisme} />
                 <Row label="Durée" value={produit.duree} />
-                <Row label="Date de constatation initiale" value={formatDate(produit.date_constatation_initiale)} />
+                <Row label="Date de constatation initiale" value={produit.date_constatation_initiale} />
                 <Row label="Fréquence rappel" value={produit.frequence_rappel} />
                 <Row label="Date fin commercialisation" value={formatDate(produit.date_fin_commercialisation)} />
                 <Row label="Éligible contrats" value={produit.eligible_contrats} />
