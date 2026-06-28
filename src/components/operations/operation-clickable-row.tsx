@@ -6,6 +6,7 @@ import { OperationRowActions } from "./operation-row-actions";
 
 interface OperationClickableRowProps {
   operation: Operation & { clients?: { nom: string; prenom: string | null } | null };
+  defaultLignes?: { isin: string; montant: number | string }[];
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -24,6 +25,7 @@ interface OperationClickableRowProps {
  */
 export function OperationClickableRow({
   operation,
+  defaultLignes,
   clients,
   conseillers,
   typeOps,
@@ -50,6 +52,7 @@ export function OperationClickableRow({
       <td className="hidden" data-no-row-click>
         <OperationRowActions
           operation={operation}
+          defaultLignes={defaultLignes}
           clients={clients}
           conseillers={conseillers}
           typeOps={typeOps}

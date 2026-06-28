@@ -9,9 +9,12 @@ import { deleteOperation, updateOperation, addRefValue } from "@/app/operations/
 import type { OperationFormData } from "@/app/operations/actions";
 import type { Operation, Client, Conseiller } from "@/lib/types";
 import { OperationFormInner } from "./operation-form-inner";
+import { isInvestmentType } from "@/lib/utils";
 
 interface RowActionsProps {
   operation: Operation & { clients?: { nom: string; prenom: string | null } | null };
+  /** Supports existants de l'opération (pour pré-remplir le formulaire d'édition) */
+  defaultLignes?: { isin: string; montant: number | string }[];
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -27,6 +30,7 @@ interface RowActionsProps {
 
 export function OperationRowActions({
   operation,
+  defaultLignes,
   clients,
   conseillers,
   typeOps,
@@ -87,10 +91,21 @@ export function OperationRowActions({
     setSaving(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
+
+    const typeOp = String(fd.get("type_operation") || "");
+    const isInvestissement = isInvestmentType(typeOp);
+
+    // Construction des lignes supports depuis le FormData
+    const ligneIsins = fd.getAll("ligne_isin").map((v) => String(v).trim());
+    const ligneMontants = fd.getAll("ligne_montant").map((v) => String(v).trim());
+    const lignes = ligneIsins
+      .map((isin, i) => ({ isin, montant: ligneMontants[i] ?? "" }))
+      .filter((l) => l.isin !== "" || l.montant !== "");
+
     const data: OperationFormData = {
       date: String(fd.get("date") || ""),
       client_id: String(fd.get("client_id") || ""),
-      type_operation: String(fd.get("type_operation") || ""),
+      type_operation: typeOp,
       produit: String(fd.get("produit") || ""),
       compagnie: String(fd.get("compagnie") || ""),
       contrat: String(fd.get("contrat") || ""),
@@ -107,6 +122,7 @@ export function OperationRowActions({
       lettre_mission: String(fd.get("lettre_mission") || "a_faire"),
       conformite: String(fd.get("conformite") || "a_faire"),
       date_facturation: String(fd.get("date_facturation") || ""),
+      lignes: isInvestissement && lignes.length > 0 ? lignes : undefined,
     };
     const result = await updateOperation(operation.id, data);
     setSaving(false);
@@ -153,6 +169,7 @@ export function OperationRowActions({
             </div>
             <OperationFormInner
               defaultValues={operation}
+              defaultLignes={defaultLignes}
               clients={clients}
               conseillers={conseillers}
               typeOps={localTypeOps}

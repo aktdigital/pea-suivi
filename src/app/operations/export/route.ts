@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     conformite: string | null;
     clients?: { nom: string; prenom: string | null } | null;
     created_by_profile?: { id: string; full_name: string | null; email: string | null } | null;
+    operation_lignes?: { isin: string | null; montant: number | null }[];
   };
 
   // Pagination obligatoire (plafond PostgREST 1000) : on reconstruit la requête —
@@ -58,7 +59,8 @@ export async function GET(request: NextRequest) {
         .select(`
       id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
       clients(nom, prenom),
-      created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
+      created_by_profile:profiles!operations_created_by_fkey(id, full_name, email),
+      operation_lignes(isin, montant)
     `);
       if (moisEffectif) {
         const [year, month] = moisEffectif.split("-");
@@ -139,7 +141,7 @@ export async function GET(request: NextRequest) {
     const nomConseiller = codeConseiller
       ? (conseillerMap[codeConseiller] ?? codeConseiller)
       : "";
-    const par = op.created_by_profile
+    const parField = op.created_by_profile
       ? (op.created_by_profile.full_name ?? op.created_by_profile.email ?? "")
       : "";
     const collecte =
@@ -158,6 +160,12 @@ export async function GET(request: NextRequest) {
       ? (controleMap[op.conformite] ?? op.conformite)
       : "";
 
+    // ISIN : liste les ISIN des supports séparés par " ; " (ou isin legacy si pas de lignes)
+    const lignes = op.operation_lignes ?? [];
+    const isinColonne = lignes.length > 0
+      ? lignes.map((l) => l.isin ?? "").filter(Boolean).join(" ; ")
+      : (op.isin ?? "");
+
     return [
       formatDateCsv(op.date),
       formatDateCsv(op.date_fin),
@@ -169,10 +177,10 @@ export async function GET(request: NextRequest) {
       formatMontantCsv(op.montant),
       collecte,
       nomConseiller,
-      par,
+      parField,
       op.statut ?? "",
       op.support_type ?? "",
-      op.isin ?? "",
+      isinColonne,
       formatBoolCsv(op.validation),
       courrierPea,
       lettreMission,

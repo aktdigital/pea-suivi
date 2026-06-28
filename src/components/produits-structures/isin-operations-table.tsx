@@ -1,23 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, isRachat } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import type { Operation, Client, Conseiller } from "@/lib/types";
+import type { Client, Conseiller } from "@/lib/types";
 import { OperationClickableRow } from "@/components/operations/operation-clickable-row";
 
-interface OpClient {
-  id?: string | null;
-  nom: string;
-  prenom: string | null;
-}
+/** Opération parente telle que retournée par la requête imbriquée */
+type ParentOperation = {
+  id: string;
+  date: string;
+  type_operation: string | null;
+  compagnie: string | null;
+  contrat: string | null;
+  collecte_type: string | null;
+  statut: string | null;
+  conseiller_code: string | null;
+  date_facturation: string | null;
+  client_id: string | null;
+  commentaire: string | null;
+  produit: string | null;
+  isin: string | null;
+  clients: { id?: string | null; nom: string; prenom: string | null } | null;
+};
 
-export type IsinOperation = Operation & {
-  clients?: OpClient | null;
+/** Une ligne de `operation_lignes` jointe à son opération parente */
+export type IsinLigne = {
+  montant: number | null;
+  isin: string | null;
+  operations: ParentOperation;
 };
 
 interface IsinOperationsTableProps {
-  operations: IsinOperation[];
+  lignes: IsinLigne[];
   totalMontant: number;
   totalNewCash: number;
   totalEncours: number;
@@ -54,14 +69,14 @@ function getStatutVariant(statut: string | null): "default" | "success" | "warni
 }
 
 export function IsinOperationsTable({
-  operations,
+  lignes,
   totalMontant,
   totalNewCash,
   totalEncours,
   restantAFaire,
   editRefs,
 }: IsinOperationsTableProps) {
-  if (operations.length === 0) {
+  if (lignes.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground border rounded-lg border-pea-gray/20">
         <p className="text-sm">Aucune opération sur ce produit pour l&apos;instant.</p>
@@ -69,36 +84,35 @@ export function IsinOperationsTable({
     );
   }
 
-  // Agrégats par statut
+  // Agrégats par statut (depuis l'opération parente)
   const statutMap = new Map<string, { count: number; montant: number }>();
-  // Seed les statuts officiels
   for (const s of STATUTS_OFFICIELS) {
     statutMap.set(s, { count: 0, montant: 0 });
   }
-  for (const op of operations) {
-    const key = op.statut ?? "(sans statut)";
+  for (const ligne of lignes) {
+    const key = ligne.operations.statut ?? "(sans statut)";
     const existing = statutMap.get(key) ?? { count: 0, montant: 0 };
     statutMap.set(key, {
       count: existing.count + 1,
-      montant: existing.montant + (op.montant ?? 0),
+      montant: existing.montant + (ligne.montant ?? 0),
     });
   }
 
   // Agrégats par compagnie
   const compagnieMap = new Map<string, number>();
-  for (const op of operations) {
-    const key = op.compagnie ?? "(sans compagnie)";
-    compagnieMap.set(key, (compagnieMap.get(key) ?? 0) + (op.montant ?? 0));
+  for (const ligne of lignes) {
+    const key = ligne.operations.compagnie ?? "(sans compagnie)";
+    compagnieMap.set(key, (compagnieMap.get(key) ?? 0) + (ligne.montant ?? 0));
   }
 
   // Total racheté par anticipation
-  const totalRachete = operations
-    .filter((op) => (op.statut ?? "").toLowerCase().includes("racheté"))
-    .reduce((acc, op) => acc + (op.montant ?? 0), 0);
+  const totalRachete = lignes
+    .filter((l) => (l.operations.statut ?? "").toLowerCase().includes("racheté"))
+    .reduce((acc, l) => acc + (l.montant ?? 0), 0);
 
   return (
     <div className="space-y-6">
-      {/* Tableau des opérations */}
+      {/* Tableau des lignes */}
       <div className="rounded-lg border border-pea-gray/20 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -116,11 +130,36 @@ export function IsinOperationsTable({
             </tr>
           </thead>
           <tbody>
-            {operations.map((op, i) => {
+            {lignes.map((ligne, i) => {
+              const op = ligne.operations;
               const clientName = op.clients
                 ? `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()
                 : null;
               const rowClass = `border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`;
+
+              // Construire un objet Operation-compatible pour OperationClickableRow
+              const operationObj = {
+                ...op,
+                montant: op.collecte_type === "encours" && isRachat(op.type_operation)
+                  ? -(ligne.montant ?? 0)
+                  : (ligne.montant ?? null),
+                // Champs requis par le type Operation
+                validation: false,
+                devoir_conseil: false,
+                assistante_id: null,
+                created_by: null,
+                created_at: "",
+                updated_at: "",
+                courrier_pea: null,
+                lettre_mission: null,
+                conformite: null,
+                controle_par_id: null,
+                controle_at: null,
+                date_fin: null,
+                support_type: null,
+                clients: op.clients ? { nom: op.clients.nom, prenom: op.clients.prenom } : null,
+              };
+
               const cells = (
                 <>
                   <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
@@ -142,7 +181,7 @@ export function IsinOperationsTable({
                     {op.contrat && <div className="text-xs text-muted-foreground">{op.contrat}</div>}
                   </td>
                   <td className="px-3 py-2 text-right whitespace-nowrap font-medium">
-                    {formatCurrency(op.montant)}
+                    {formatCurrency(ligne.montant)}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {op.collecte_type === "new_cash" ? (
@@ -171,8 +210,8 @@ export function IsinOperationsTable({
               if (editRefs) {
                 return (
                   <OperationClickableRow
-                    key={op.id}
-                    operation={op}
+                    key={`${op.id}-${i}`}
+                    operation={operationObj as import("@/lib/types").Operation & { clients?: { nom: string; prenom: string | null } | null }}
                     clients={editRefs.clients}
                     conseillers={editRefs.conseillers}
                     typeOps={editRefs.typeOps}
@@ -189,7 +228,7 @@ export function IsinOperationsTable({
               }
 
               return (
-                <tr key={op.id} className={rowClass}>
+                <tr key={`${op.id}-${i}`} className={rowClass}>
                   {cells}
                 </tr>
               );
@@ -198,7 +237,7 @@ export function IsinOperationsTable({
           <tfoot>
             <tr className="border-t border-pea-gray/30 bg-pea-blue/5 font-semibold">
               <td className="px-3 py-2 text-xs text-pea-blue uppercase tracking-wide" colSpan={4}>
-                Total ({operations.length} opération{operations.length > 1 ? "s" : ""})
+                Total ({lignes.length} ligne{lignes.length > 1 ? "s" : ""})
               </td>
               <td className="px-3 py-2 text-right whitespace-nowrap text-pea-blue">
                 {formatCurrency(totalMontant)}

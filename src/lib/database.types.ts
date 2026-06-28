@@ -212,6 +212,38 @@ export type Database = {
           },
         ]
       }
+      operation_lignes: {
+        Row: {
+          created_at: string
+          id: string
+          isin: string | null
+          montant: number | null
+          operation_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          isin?: string | null
+          montant?: number | null
+          operation_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          isin?: string | null
+          montant?: number | null
+          operation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operation_lignes_operation_id_fkey"
+            columns: ["operation_id"]
+            isOneToOne: false
+            referencedRelation: "operations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operations: {
         Row: {
           assistante_id: string | null

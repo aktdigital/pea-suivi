@@ -32,3 +32,7 @@ export const MOIS = [
 export function isRachat(typeOperation: string | null | undefined): boolean {
   return /rachat/i.test(typeOperation ?? "");
 }
+
+export function isInvestmentType(t: string | null | undefined): boolean {
+  return /souscription|versement|arbitrage|rachat|passage d'ordre|ordre de remplacement/i.test(t ?? "");
+}

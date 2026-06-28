@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createOperation, createOperationsMulti, addRefValue } from "@/app/operations/actions";
+import { createOperation, addRefValue } from "@/app/operations/actions";
 import type { OperationFormData } from "@/app/operations/actions";
 import type { Client, Conseiller } from "@/lib/types";
 import { OperationFormInner } from "./operation-form-inner";
+import { isInvestmentType } from "@/lib/utils";
 
 interface OperationFormProps {
   clients: Client[];
@@ -58,10 +59,21 @@ export function OperationFormButton({
     setSaving(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
+
+    const typeOp = String(fd.get("type_operation") || "");
+    const isInvestissement = isInvestmentType(typeOp);
+
+    // Construction des lignes supports depuis le FormData
+    const ligneIsins = fd.getAll("ligne_isin").map((v) => String(v).trim());
+    const ligneMontants = fd.getAll("ligne_montant").map((v) => String(v).trim());
+    const lignes = ligneIsins
+      .map((isin, i) => ({ isin, montant: ligneMontants[i] ?? "" }))
+      .filter((l) => l.isin !== "" || l.montant !== "");
+
     const data: OperationFormData = {
       date: String(fd.get("date") || ""),
       client_id: String(fd.get("client_id") || ""),
-      type_operation: String(fd.get("type_operation") || ""),
+      type_operation: typeOp,
       produit: String(fd.get("produit") || ""),
       compagnie: String(fd.get("compagnie") || ""),
       contrat: String(fd.get("contrat") || ""),
@@ -75,24 +87,10 @@ export function OperationFormButton({
       devoir_conseil: fd.get("devoir_conseil") === "on",
       commentaire: String(fd.get("commentaire") || ""),
       date_facturation: String(fd.get("date_facturation") || ""),
+      lignes: isInvestissement && lignes.length > 0 ? lignes : undefined,
     };
-    // Option B : fonds supplémentaires saisis → on crée une opération par (isin, montant)
-    const extraIsins = fd.getAll("extra_isin").map((v) => String(v).trim());
-    const extraMontants = fd.getAll("extra_montant").map((v) => String(v).trim());
-    const extras = extraIsins
-      .map((isin, i) => ({ isin, montant: extraMontants[i] ?? "" }))
-      .filter((f) => f.isin !== "" || f.montant !== "");
 
-    let result;
-    if (extras.length > 0) {
-      const { isin, montant, ...common } = data;
-      const fonds = [{ isin: isin.trim(), montant: montant.trim() }, ...extras].filter(
-        (f) => f.isin !== "" || f.montant !== ""
-      );
-      result = await createOperationsMulti(common, fonds);
-    } else {
-      result = await createOperation(data);
-    }
+    const result = await createOperation(data);
     setSaving(false);
     if (result?.error) {
       setError(result.error);
@@ -102,6 +100,9 @@ export function OperationFormButton({
   }
 
   const today = new Date().toISOString().split("T")[0];
+
+  // Pré-remplissage ISIN en mode investissement si defaultIsin fourni
+  const defaultLignes = defaultIsin ? [{ isin: defaultIsin, montant: "" }] : undefined;
 
   return (
     <>
@@ -122,6 +123,7 @@ export function OperationFormButton({
 
             <OperationFormInner
               defaultValues={{ isin: defaultIsin ?? "", date: today }}
+              defaultLignes={defaultLignes}
               clients={clients}
               conseillers={conseillers}
               typeOps={localTypeOps}
@@ -136,7 +138,6 @@ export function OperationFormButton({
               canManageRefs={canManageRefs}
               onAddRef={handleAddRef}
               submitLabel="Créer l'opération"
-              allowMultiIsin
             />
           </div>
         </div>

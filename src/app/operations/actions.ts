@@ -6,6 +6,8 @@ import type { Database } from "@/lib/database.types";
 
 type OperationUpdate = Database["public"]["Tables"]["operations"]["Update"];
 
+export type LigneFormData = { isin: string; montant: string };
+
 export type OperationFormData = {
   date: string;
   client_id: string;
@@ -26,84 +28,66 @@ export type OperationFormData = {
   lettre_mission?: string;
   conformite?: string;
   date_facturation?: string;
+  /** Supports d'une opération d'investissement (multi-ISIN). */
+  lignes?: LigneFormData[];
 };
 
 export async function createOperation(formData: OperationFormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { error } = await supabase.from("operations").insert({
+  const lignes = (formData.lignes ?? []).filter((l) => l.isin || l.montant);
+
+  // Calcul montant total et isin selon présence de lignes
+  let montantTotal: number | null = formData.montant ? parseFloat(formData.montant) : null;
+  let isinValue: string | null = formData.isin || null;
+
+  if (lignes.length > 0) {
+    montantTotal = lignes.reduce((acc, l) => acc + (l.montant ? parseFloat(l.montant) : 0), 0);
+    isinValue = lignes.length === 1 ? (lignes[0].isin || null) : null;
+  }
+
+  const { data: op, error } = await supabase.from("operations").insert({
     date: formData.date,
     client_id: formData.client_id || null,
     type_operation: formData.type_operation || null,
     produit: formData.produit || null,
     compagnie: formData.compagnie || null,
     contrat: formData.contrat || null,
-    montant: formData.montant ? parseFloat(formData.montant) : null,
+    montant: montantTotal,
     collecte_type: formData.collecte_type || null,
     conseiller_code: formData.conseiller_code || null,
     statut: formData.statut || null,
     support_type: formData.support_type || null,
-    isin: formData.isin || null,
+    isin: isinValue,
     validation: formData.validation ?? false,
     devoir_conseil: formData.devoir_conseil ?? false,
     commentaire: formData.commentaire || null,
     date_facturation: formData.date_facturation || null,
     created_by: user?.id ?? null,
     assistante_id: user?.id ?? null,
-  });
+  }).select("id").single();
 
   if (error) {
     return { error: error.message };
   }
 
+  // Insertion des lignes si présentes
+  if (lignes.length > 0 && op) {
+    const ligneRows = lignes.map((l) => ({
+      operation_id: op.id,
+      isin: l.isin || null,
+      montant: l.montant ? parseFloat(l.montant) : null,
+    }));
+    const { error: lignesError } = await supabase.from("operation_lignes").insert(ligneRows);
+    if (lignesError) {
+      return { error: lignesError.message };
+    }
+  }
+
   revalidatePath("/operations");
   revalidatePath("/");
   return { success: true };
-}
-
-/**
- * Option B (opération multi-fonds) : crée N opérations partageant les MÊMES champs
- * communs, une par couple (isin, montant). Évite de re-saisir X lignes pour un
- * arbitrage sur plusieurs fonds. Le modèle reste 1 ISIN/opération (analytique par
- * produit intacte) — on automatise juste la création des lignes.
- */
-export async function createOperationsMulti(
-  common: Omit<OperationFormData, "isin" | "montant">,
-  fonds: { isin: string; montant: string }[]
-) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!fonds.length) return { error: "Aucun fonds renseigné." };
-
-  const rows = fonds.map((f) => ({
-    date: common.date,
-    client_id: common.client_id || null,
-    type_operation: common.type_operation || null,
-    produit: common.produit || null,
-    compagnie: common.compagnie || null,
-    contrat: common.contrat || null,
-    montant: f.montant ? parseFloat(f.montant) : null,
-    collecte_type: common.collecte_type || null,
-    conseiller_code: common.conseiller_code || null,
-    statut: common.statut || null,
-    support_type: common.support_type || null,
-    isin: f.isin || null,
-    validation: common.validation ?? false,
-    devoir_conseil: common.devoir_conseil ?? false,
-    commentaire: common.commentaire || null,
-    date_facturation: common.date_facturation || null,
-    created_by: user?.id ?? null,
-    assistante_id: user?.id ?? null,
-  }));
-
-  const { error } = await supabase.from("operations").insert(rows);
-  if (error) return { error: error.message };
-
-  revalidatePath("/operations");
-  revalidatePath("/");
-  return { success: true, count: rows.length };
 }
 
 export async function updateOperation(id: string, formData: OperationFormData) {
@@ -122,6 +106,17 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     formData.lettre_mission !== undefined && formData.lettre_mission !== existing?.lettre_mission ||
     formData.conformite !== undefined && formData.conformite !== existing?.conformite;
 
+  const lignes = (formData.lignes ?? []).filter((l) => l.isin || l.montant);
+
+  // Calcul montant total et isin
+  let montantTotal: number | null = formData.montant ? parseFloat(formData.montant) : null;
+  let isinValue: string | null = formData.isin || null;
+
+  if (lignes.length > 0) {
+    montantTotal = lignes.reduce((acc, l) => acc + (l.montant ? parseFloat(l.montant) : 0), 0);
+    isinValue = lignes.length === 1 ? (lignes[0].isin || null) : null;
+  }
+
   const updateData: OperationUpdate = {
     date: formData.date,
     client_id: formData.client_id || null,
@@ -129,12 +124,12 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     produit: formData.produit || null,
     compagnie: formData.compagnie || null,
     contrat: formData.contrat || null,
-    montant: formData.montant ? parseFloat(formData.montant) : null,
+    montant: montantTotal,
     collecte_type: formData.collecte_type || null,
     conseiller_code: formData.conseiller_code || null,
     statut: formData.statut || null,
     support_type: formData.support_type || null,
-    isin: formData.isin || null,
+    isin: isinValue,
     validation: formData.validation ?? false,
     devoir_conseil: formData.devoir_conseil ?? false,
     commentaire: formData.commentaire || null,
@@ -151,6 +146,22 @@ export async function updateOperation(id: string, formData: OperationFormData) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Remplace les lignes existantes si des supports sont fournis
+  if (lignes.length > 0) {
+    // Supprime les lignes existantes
+    await supabase.from("operation_lignes").delete().eq("operation_id", id);
+    // Ré-insère
+    const ligneRows = lignes.map((l) => ({
+      operation_id: id,
+      isin: l.isin || null,
+      montant: l.montant ? parseFloat(l.montant) : null,
+    }));
+    const { error: lignesError } = await supabase.from("operation_lignes").insert(ligneRows);
+    if (lignesError) {
+      return { error: lignesError.message };
+    }
   }
 
   revalidatePath("/operations");

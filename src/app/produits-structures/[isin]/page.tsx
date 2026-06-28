@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate, isRachat } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
-import type { Client, Conseiller, Operation } from "@/lib/types";
+import type { Client, Conseiller } from "@/lib/types";
 import { OperationFormButton } from "@/components/operations/operation-form";
-import { IsinOperationsTable, type IsinOperation } from "@/components/produits-structures/isin-operations-table";
+import { IsinOperationsTable, type IsinLigne } from "@/components/produits-structures/isin-operations-table";
 import { ModifierProduitDialog } from "@/components/produits-structures/modifier-produit-dialog";
 
 interface PageProps {
@@ -45,7 +45,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
 
   const [
     { data: produit },
-    { data: operations },
+    { data: lignesRaw },
     { data: conseillers },
     { data: refStatuts },
     { data: refOps },
@@ -62,11 +62,11 @@ export default async function ProduitDetailPage({ params }: PageProps) {
       .select("isin, nom_produit, sous_jacent, mecanisme, duree, frequence_rappel, protection_gain, protection_capital, degressivite, objectif_rendement, eligible_contrats, upfront_brut, date_fin_commercialisation, enveloppe_reservee, montant_fait, restant_a_faire, compagnies_cibles, commentaire, active, structureur, total_new_cash, total_encours, ca_up_front, mois_creation, date_facturation, statut_facturation, date_constatation_initiale")
       .eq("isin", decodedIsin)
       .single(),
+    // Requête sur operation_lignes pour obtenir la quote-part de ce produit
     supabase
-      .from("operations")
-      .select("id, date, date_fin, type_operation, montant, collecte_type, conseiller_code, statut, compagnie, contrat, produit, isin, client_id, commentaire, date_facturation, support_type, validation, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_by, assistante_id, created_at, updated_at, clients(id, nom, prenom)")
-      .eq("isin", decodedIsin)
-      .order("date", { ascending: false }),
+      .from("operation_lignes")
+      .select("montant, isin, operations(id, date, type_operation, compagnie, contrat, collecte_type, statut, conseiller_code, date_facturation, client_id, commentaire, produit, isin, clients(id, nom, prenom))")
+      .eq("isin", decodedIsin),
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
     supabase.from("ref_statuts").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_operations").select("id, label, ordre, active").eq("active", true).order("ordre"),
@@ -106,13 +106,46 @@ export default async function ProduitDetailPage({ params }: PageProps) {
     ? produit.montant_fait > produit.enveloppe_reservee
     : false;
 
-  const totalNewCash = (operations ?? [])
-    .filter((op) => op.collecte_type === "new_cash")
-    .reduce((acc, op) => acc + (op.montant ?? 0), 0);
-  const totalEncours = (operations ?? [])
-    .filter((op) => op.collecte_type === "encours")
-    .reduce((acc, op) => acc + (isRachat(op.type_operation) ? -1 : 1) * (op.montant ?? 0), 0);
-  const totalMontant = (operations ?? []).reduce((acc, op) => acc + (op.montant ?? 0), 0);
+  // Calcul des agrégats depuis les operation_lignes
+  type LigneRaw = {
+    montant: number | null;
+    isin: string | null;
+    operations: {
+      id: string;
+      date: string;
+      type_operation: string | null;
+      compagnie: string | null;
+      contrat: string | null;
+      collecte_type: string | null;
+      statut: string | null;
+      conseiller_code: string | null;
+      date_facturation: string | null;
+      client_id: string | null;
+      commentaire: string | null;
+      produit: string | null;
+      isin: string | null;
+      clients: { id?: string | null; nom: string; prenom: string | null } | null;
+    } | null;
+  };
+
+  const lignes: LigneRaw[] = (lignesRaw ?? []) as LigneRaw[];
+
+  const totalNewCash = lignes
+    .filter((l) => l.operations?.collecte_type === "new_cash")
+    .reduce((acc, l) => acc + (l.montant ?? 0), 0);
+  const totalEncours = lignes
+    .filter((l) => l.operations?.collecte_type === "encours")
+    .reduce((acc, l) => acc + (isRachat(l.operations?.type_operation) ? -1 : 1) * (l.montant ?? 0), 0);
+  const totalMontant = lignes.reduce((acc, l) => acc + (l.montant ?? 0), 0);
+
+  // Construire les IsinLigne pour le composant table
+  const isinLignes: IsinLigne[] = lignes
+    .filter((l) => l.operations !== null)
+    .map((l) => ({
+      montant: l.montant,
+      isin: l.isin,
+      operations: l.operations!,
+    }));
 
   return (
     <AppShell>
@@ -281,7 +314,7 @@ export default async function ProduitDetailPage({ params }: PageProps) {
         <div className="space-y-3">
           <h2 className="text-lg font-serif font-semibold text-pea-blue">Détail investisseurs</h2>
           <IsinOperationsTable
-            operations={(operations ?? []) as IsinOperation[]}
+            lignes={isinLignes}
             totalMontant={totalMontant}
             totalNewCash={totalNewCash}
             totalEncours={totalEncours}

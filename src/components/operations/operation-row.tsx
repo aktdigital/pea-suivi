@@ -6,12 +6,14 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { OperationRowActions } from "./operation-row-actions";
 import type { Client, Conseiller, Operation } from "@/lib/types";
+import type { OperationLigne } from "./operations-table";
 
 type CreatedByProfile = { id: string; full_name: string | null; email: string | null } | null;
 
 export type OpWithProfile = Operation & {
   clients?: { nom: string; prenom: string | null } | null;
   created_by_profile?: CreatedByProfile;
+  operation_lignes?: OperationLigne[];
 };
 
 interface OperationRowProps {
@@ -47,6 +49,15 @@ function getStatutVariant(statut: string | null): "default" | "success" | "warni
   return "secondary" as "default";
 }
 
+/** Affichage de la colonne ISIN selon le nombre de supports */
+function isinDisplay(op: OpWithProfile): string {
+  const lignes = op.operation_lignes ?? [];
+  const nb = lignes.length;
+  if (nb > 1) return `${nb} supports`;
+  if (nb === 1) return lignes[0].isin ?? "—";
+  return op.isin ?? "—";
+}
+
 export function OperationRow({
   op,
   index,
@@ -66,6 +77,12 @@ export function OperationRow({
     if (target.closest("a") || target.closest("[data-no-row-click]")) return;
     setEditOpen(true);
   }
+
+  // Mapper les lignes en defaultLignes pour le formulaire d'édition
+  const defaultLignes = (op.operation_lignes ?? []).map((l) => ({
+    isin: l.isin ?? "",
+    montant: l.montant ?? "",
+  }));
 
   return (
     <tr
@@ -116,7 +133,7 @@ export function OperationRow({
         {op.support_type ?? "—"}
       </td>
       <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
-        {op.isin ?? "—"}
+        {isinDisplay(op)}
       </td>
       <td className="px-3 py-2 text-center">
         {op.validation ? (
@@ -140,6 +157,7 @@ export function OperationRow({
       <td className="px-3 py-2" data-no-row-click>
         <OperationRowActions
           operation={op}
+          defaultLignes={defaultLignes.length > 0 ? defaultLignes : undefined}
           clients={clients}
           conseillers={conseillers}
           typeOps={typeOps}

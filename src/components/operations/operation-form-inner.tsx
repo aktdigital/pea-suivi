@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import type { Operation, Client, Conseiller, StatutControle } from "@/lib/types";
 import { STATUTS_CONTROLE } from "@/lib/types";
+import { isInvestmentType } from "@/lib/utils";
 
 export interface OperationFormInnerProps {
   defaultValues?: Partial<Operation & {
@@ -10,6 +11,8 @@ export interface OperationFormInnerProps {
     lettre_mission?: StatutControle | null;
     conformite?: StatutControle | null;
   }>;
+  /** Lignes support pré-remplies (édition multi-ISIN) */
+  defaultLignes?: { isin: string; montant: number | string }[];
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -24,8 +27,6 @@ export interface OperationFormInnerProps {
   canManageRefs?: boolean;
   onAddRef?: (kind: "compagnie" | "type", label: string) => Promise<string | null>;
   submitLabel?: string;
-  /** Active la saisie multi-fonds (plusieurs ISIN sur une même saisie) — création uniquement. */
-  allowMultiIsin?: boolean;
 }
 
 function AddRefInline({
@@ -88,6 +89,7 @@ function AddRefInline({
 
 export function OperationFormInner({
   defaultValues,
+  defaultLignes,
   clients,
   conseillers,
   typeOps,
@@ -102,7 +104,6 @@ export function OperationFormInner({
   canManageRefs = false,
   onAddRef,
   submitLabel = "Enregistrer",
-  allowMultiIsin = false,
 }: OperationFormInnerProps) {
   const today = new Date().toISOString().split("T")[0];
   // Local copies so newly added values appear immediately in the select
@@ -111,16 +112,25 @@ export function OperationFormInner({
   const [typeOpValue, setTypeOpValue] = useState(defaultValues?.type_operation ?? "");
   const [compagnieValue, setCompagnieValue] = useState(defaultValues?.compagnie ?? "");
 
-  // Option B : fonds supplémentaires (création multi-ISIN). Chaque ligne => une opération.
-  const [extraFonds, setExtraFonds] = useState<number[]>([]);
-  const fondsKeyRef = useRef(0);
-  function addFonds() {
-    fondsKeyRef.current += 1;
-    setExtraFonds((prev) => [...prev, fondsKeyRef.current]);
+  // Section « Supports » (mode investissement)
+  const initLignes = defaultLignes && defaultLignes.length > 0
+    ? defaultLignes.map((l) => ({ isin: String(l.isin ?? ""), montant: String(l.montant ?? "") }))
+    : [{ isin: "", montant: "" }];
+  const [lignes, setLignes] = useState<{ isin: string; montant: string }[]>(initLignes);
+
+  function addLigne() {
+    setLignes((prev) => [...prev, { isin: "", montant: "" }]);
   }
-  function removeFonds(key: number) {
-    setExtraFonds((prev) => prev.filter((k) => k !== key));
+  function removeLigne(index: number) {
+    setLignes((prev) => prev.filter((_, i) => i !== index));
   }
+  function updateLigne(index: number, field: "isin" | "montant", value: string) {
+    setLignes((prev) => prev.map((l, i) => i === index ? { ...l, [field]: value } : l));
+  }
+
+  const totalLignes = lignes.reduce((acc, l) => acc + (parseFloat(l.montant) || 0), 0);
+
+  const isInvestissement = isInvestmentType(typeOpValue);
 
   // Tâche B : Nortia en premier, puis alphabétique dans chaque groupe
   const sortedCompagnies = useMemo(() => {
@@ -236,18 +246,21 @@ export function OperationFormInner({
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Montant (€)</label>
-          <input
-            type="number"
-            name="montant"
-            defaultValue={defaultValues?.montant ?? ""}
-            step="0.01"
-            min="0"
-            placeholder="0.00"
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </div>
+        {/* Montant simple — masqué si type investissement */}
+        {!isInvestissement && (
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Montant (€)</label>
+            <input
+              type="number"
+              name="montant"
+              defaultValue={defaultValues?.montant ?? ""}
+              step="0.01"
+              min="0"
+              placeholder="0.00"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+        )}
 
         <div className="space-y-1">
           <label className="text-sm font-medium">Conseiller</label>
@@ -285,69 +298,82 @@ export function OperationFormInner({
           />
         </div>
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Code ISIN</label>
-          <input
-            type="text"
-            name="isin"
-            defaultValue={defaultValues?.isin ?? ""}
-            list="isin-list"
-            placeholder="Rechercher ISIN…"
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+        {/* Code ISIN simple — masqué si type investissement */}
+        {!isInvestissement && (
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Code ISIN</label>
+            <input
+              type="text"
+              name="isin"
+              defaultValue={defaultValues?.isin ?? ""}
+              list="isin-list"
+              placeholder="Rechercher ISIN…"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <datalist id="isin-list">
+              {produitsStructures.map((p) => (
+                <option key={p.isin} value={p.isin}>{p.nom_produit}</option>
+              ))}
+            </datalist>
+          </div>
+        )}
+      </div>
+
+      {/* Section Supports (mode investissement) */}
+      {isInvestissement && (
+        <div className="rounded-md border border-pea-teal/30 bg-pea-cream/40 p-3 space-y-3">
           <datalist id="isin-list">
             {produitsStructures.map((p) => (
               <option key={p.isin} value={p.isin}>{p.nom_produit}</option>
             ))}
           </datalist>
-        </div>
-      </div>
-
-      {allowMultiIsin && (
-        <div className="rounded-md border border-pea-gray/30 bg-pea-cream/40 p-3 space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">Autres fonds (même opération)</p>
-            <button type="button" onClick={addFonds} className="text-xs text-pea-teal hover:underline">
-              + Ajouter un fonds
+            <p className="text-sm font-medium text-pea-blue">Supports</p>
+            <button type="button" onClick={addLigne} className="text-xs text-pea-teal hover:underline">
+              + Ajouter un support
             </button>
           </div>
-          {extraFonds.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Arbitrage sur plusieurs fonds ? Le 1ᵉʳ fonds = le Code ISIN + Montant ci-dessus.
-              Ajoute ici un ISIN et un montant par fonds supplémentaire : chacun créera une ligne
-              d&apos;opération avec les mêmes informations communes.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {extraFonds.map((key) => (
-                <div key={key} className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    name="extra_isin"
-                    list="isin-list"
-                    placeholder="Code ISIN…"
-                    className="flex h-8 flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <input
-                    type="number"
-                    name="extra_montant"
-                    step="0.01"
-                    min="0"
-                    placeholder="Montant (€)"
-                    className="flex h-8 w-36 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
+          <div className="space-y-2">
+            {lignes.map((ligne, index) => (
+              <div key={index} className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  name="ligne_isin"
+                  list="isin-list"
+                  value={ligne.isin}
+                  onChange={(e) => updateLigne(index, "isin", e.target.value)}
+                  placeholder="Code ISIN…"
+                  className="flex h-8 flex-1 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                <input
+                  type="number"
+                  name="ligne_montant"
+                  value={ligne.montant}
+                  onChange={(e) => updateLigne(index, "montant", e.target.value)}
+                  step="0.01"
+                  min="0"
+                  placeholder="Montant (€)"
+                  className="flex h-8 w-36 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+                {lignes.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => removeFonds(key)}
-                    className="text-pea-rust text-sm px-2"
-                    aria-label="Retirer ce fonds"
+                    onClick={() => removeLigne(index)}
+                    className="text-pea-rust text-sm px-2 flex-shrink-0"
+                    aria-label="Retirer ce support"
                   >
                     ✕
                   </button>
-                </div>
-              ))}
-            </div>
-          )}
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end items-center gap-2 pt-1 border-t border-pea-teal/20">
+            <span className="text-xs text-pea-gray">Total :</span>
+            <span className="text-sm font-semibold text-pea-blue">
+              {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(totalLignes)}
+            </span>
+          </div>
         </div>
       )}
 

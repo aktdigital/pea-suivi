@@ -4,6 +4,8 @@ import type { Client, Conseiller, Operation } from "@/lib/types";
 
 type CreatedByProfile = { id: string; full_name: string | null; email: string | null } | null;
 
+export type OperationLigne = { isin: string | null; montant: number | null };
+
 interface OperationsTableProps {
   mois?: string;
   conseiller?: string;
@@ -55,7 +57,8 @@ export async function OperationsTable({
     .select(`
       id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, devoir_conseil, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
       clients(nom, prenom),
-      created_by_profile:profiles!operations_created_by_fkey(id, full_name, email)
+      created_by_profile:profiles!operations_created_by_fkey(id, full_name, email),
+      operation_lignes(isin, montant)
     `)
     .order("date", { ascending: false });
 
@@ -91,6 +94,7 @@ export async function OperationsTable({
   type OpWithClient = Operation & {
     clients?: { nom: string; prenom: string | null } | null;
     created_by_profile?: CreatedByProfile;
+    operation_lignes?: OperationLigne[];
   };
 
   let filtered: OpWithClient[] = (operations ?? []) as OpWithClient[];
