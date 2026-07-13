@@ -7,7 +7,10 @@ import type { Operation, Client, Conseiller } from "@/lib/types";
 import { OperationClickableRow } from "@/components/operations/operation-clickable-row";
 
 interface ClientOperationsSectionProps {
-  operations: (Operation & { clients?: { nom: string; prenom: string | null } | null })[];
+  operations: (Operation & {
+    clients?: { nom: string; prenom: string | null } | null;
+    operation_lignes?: { isin: string | null; montant: number | null }[];
+  })[];
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -64,10 +67,17 @@ export function ClientOperationsSection({
                 </tr>
               </thead>
               <tbody>
-                {operations.map((op, i) => (
+                {operations.map((op, i) => {
+                  // Supports existants → pré-remplissage de la popup d'édition
+                  const defaultLignes = (op.operation_lignes ?? []).map((l) => ({
+                    isin: l.isin ?? "",
+                    montant: l.montant ?? "",
+                  }));
+                  return (
                   <OperationClickableRow
                     key={op.id}
                     operation={op}
+                    defaultLignes={defaultLignes.length > 0 ? defaultLignes : undefined}
                     clients={clients}
                     conseillers={conseillers}
                     typeOps={typeOps}
@@ -91,7 +101,8 @@ export function ClientOperationsSection({
                       ) : "—"}
                     </td>
                   </OperationClickableRow>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

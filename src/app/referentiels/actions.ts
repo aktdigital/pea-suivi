@@ -63,7 +63,37 @@ async function checkRole() {
   return { supabase, error: null };
 }
 
-// Renomme le label d'une entrée
+/**
+ * Propagation du renommage : les opérations / produits stockent le LIBELLÉ en
+ * texte (pas l'id). Sans propagation, renommer une valeur de référentiel
+ * laisse les lignes existantes sur l'ancien libellé (filtres et listes
+ * incohérents). On répercute donc le nouveau libellé sur les lignes liées.
+ */
+async function propagateRename(
+  supabase: NonNullable<Awaited<ReturnType<typeof checkRole>>["supabase"]>,
+  table: AllowedTable,
+  oldLabel: string,
+  newLabel: string
+): Promise<{ message: string } | null> {
+  switch (table) {
+    case "ref_compagnies":
+      return (await supabase.from("operations").update({ compagnie: newLabel }).eq("compagnie", oldLabel)).error;
+    case "ref_operations":
+      return (await supabase.from("operations").update({ type_operation: newLabel }).eq("type_operation", oldLabel)).error;
+    case "ref_statuts":
+      return (await supabase.from("operations").update({ statut: newLabel }).eq("statut", oldLabel)).error;
+    case "ref_produits":
+      return (await supabase.from("operations").update({ produit: newLabel }).eq("produit", oldLabel)).error;
+    case "ref_supports":
+      return (await supabase.from("operations").update({ support_type: newLabel }).eq("support_type", oldLabel)).error;
+    case "ref_structureurs":
+      return (await supabase.from("produits_structures").update({ structureur: newLabel }).eq("structureur", oldLabel)).error;
+    case "ref_frequences":
+      return (await supabase.from("produits_structures").update({ frequence_rappel: newLabel }).eq("frequence_rappel", oldLabel)).error;
+  }
+}
+
+// Renomme le label d'une entrée (et propage aux lignes qui l'utilisent)
 export async function renameRef(
   table: string,
   id: number,
@@ -77,6 +107,16 @@ export async function renameRef(
   const trimmed = label.trim();
   if (!trimmed) return { error: "Le libellé ne peut pas être vide" };
 
+  // Ancien libellé (nécessaire pour la propagation)
+  const { data: current } = await supabase
+    .from(table)
+    .select("label")
+    .eq("id", id)
+    .single();
+  const oldLabel = current?.label ?? null;
+
+  if (oldLabel === trimmed) return {};
+
   const { error } = await supabase
     .from(table)
     .update({ label: trimmed })
@@ -84,7 +124,19 @@ export async function renameRef(
 
   if (error) return { error: error.message };
 
+  // Propage le nouveau libellé aux lignes qui portaient l'ancien
+  if (oldLabel) {
+    const propError = await propagateRename(supabase, table, oldLabel, trimmed);
+    if (propError) {
+      return { error: `Libellé renommé, mais la mise à jour des données liées a échoué : ${propError.message}` };
+    }
+  }
+
   revalidatePath("/referentiels");
+  revalidatePath("/operations");
+  revalidatePath("/controles");
+  revalidatePath("/produits-structures");
+  revalidatePath("/");
   return {};
 }
 

@@ -36,3 +36,18 @@ export function isRachat(typeOperation: string | null | undefined): boolean {
 export function isInvestmentType(t: string | null | undefined): boolean {
   return /souscription|versement|arbitrage|rachat|passage d'ordre|ordre de remplacement/i.test(t ?? "");
 }
+
+/**
+ * Couleur de fond d'une ligne d'opération selon son statut.
+ * Partagé entre /operations et /controles pour un code couleur cohérent.
+ */
+export function statutBgClass(statut: string | null | undefined): string {
+  if (!statut) return "bg-white";
+  const s = statut.toLowerCase();
+  if (s.includes("à saisir") || s.includes("a saisir")) return "bg-white";
+  if (s.includes("racheté") || s.includes("anticipation")) return "bg-pea-gray/15";
+  if (s.includes("validé") && s.includes("avenant")) return "bg-green-100";
+  if (s.includes("signé") && (s.includes("envoyé") || s.includes("transmis"))) return "bg-orange-100";
+  if (s.includes("envoyé") || s.includes("envoyée")) return "bg-yellow-50";
+  return "bg-white";
+}

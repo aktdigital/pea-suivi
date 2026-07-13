@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, statutBgClass } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { OperationRowActions } from "./operation-row-actions";
 import type { Client, Conseiller, Operation } from "@/lib/types";
@@ -27,17 +27,6 @@ interface OperationRowProps {
   compagnies: { id: number; label: string }[];
   produitsStructures: { isin: string; nom_produit: string }[];
   canManageRefs?: boolean;
-}
-
-function statutBgClass(statut: string | null): string {
-  if (!statut) return "bg-white";
-  const s = statut.toLowerCase();
-  if (s.includes("à saisir") || s.includes("a saisir")) return "bg-white";
-  if (s.includes("racheté") || s.includes("anticipation")) return "bg-pea-gray/15";
-  if (s.includes("validé") && s.includes("avenant")) return "bg-green-100";
-  if (s.includes("signé") && (s.includes("envoyé") || s.includes("transmis"))) return "bg-orange-100";
-  if (s.includes("envoyé") || s.includes("envoyée")) return "bg-yellow-50";
-  return "bg-white";
 }
 
 function getStatutVariant(statut: string | null): "default" | "success" | "warning" | "destructive" | "outline" {
@@ -88,7 +77,7 @@ export function OperationRow({
     <tr
       key={op.id}
       onClick={handleRowClick}
-      className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 cursor-pointer ${statutBgClass(op.statut)}`}
+      className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-blue/5 cursor-pointer ${statutBgClass(op.statut)}`}
     >
       <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
       <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{op.date_fin ? formatDate(op.date_fin) : "—"}</td>

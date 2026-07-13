@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { deleteOperation, updateOperation, addRefValue } from "@/app/operations/actions";
+import { deleteOperation, updateOperation, addRefValue, getOperationForEdit } from "@/app/operations/actions";
 import type { OperationFormData } from "@/app/operations/actions";
 import type { Operation, Client, Conseiller } from "@/lib/types";
 import { OperationFormInner } from "./operation-form-inner";
@@ -53,6 +53,20 @@ export function OperationRowActions({
   const [localTypeOps, setLocalTypeOps] = useState(typeOps);
   const [localCompagnies, setLocalCompagnies] = useState(compagnies);
 
+  // Données FRAÎCHES chargées à l'ouverture de la popup : opération complète +
+  // supports + valeurs de contrôle + assistantes. Évite d'éditer depuis des
+  // données partielles (fiche client, contrôles, fiche produit) qui écraseraient
+  // montant / supports / validation au premier « Enregistrer ».
+  type FreshData = {
+    operation: Operation & { clients?: { nom: string; prenom: string | null } | null };
+    lignes: { isin: string; montant: number | string }[];
+    statutsControle: { code: string; label: string; ordre: number | null; champ: string | null }[];
+    assistantes: { id: string; full_name: string | null; email: string | null }[];
+    currentUserId: string | null;
+  };
+  const [fresh, setFresh] = useState<FreshData | null>(null);
+  const [freshError, setFreshError] = useState(false);
+
   async function handleAddRef(kind: "compagnie" | "type", label: string): Promise<string | null> {
     const result = await addRefValue(kind, label);
     if (result.error) {
@@ -74,9 +88,33 @@ export function OperationRowActions({
       setInternalEditOpen(true);
     } else {
       setInternalEditOpen(false);
+      // Réinitialise les données fraîches pour la prochaine ouverture
+      setFresh(null);
+      setFreshError(false);
       onExternalEditClose?.();
     }
   }
+
+  // Charge les données fraîches dès que la popup s'ouvre
+  useEffect(() => {
+    if (!editOpen) return;
+    let cancelled = false;
+    getOperationForEdit(operation.id).then((res) => {
+      if (cancelled) return;
+      if (res && "operation" in res && res.operation) {
+        setFresh(res as unknown as FreshData);
+      } else {
+        // En cas d'erreur : fallback silencieux sur les props (comportement précédent)
+        setFreshError(true);
+      }
+    }).catch(() => {
+      if (!cancelled) setFreshError(true);
+    });
+    return () => { cancelled = true; };
+  }, [editOpen, operation.id]);
+
+  // Chargement en cours tant que ni données fraîches ni erreur
+  const loadingFresh = editOpen && !fresh && !freshError;
 
   async function handleDelete() {
     if (!confirm("Supprimer cette opération ?")) return;
@@ -102,6 +140,9 @@ export function OperationRowActions({
       .map((isin, i) => ({ isin, montant: ligneMontants[i] ?? "" }))
       .filter((l) => l.isin !== "" || l.montant !== "");
 
+    // Le champ assistante n'est envoyé que s'il était présent dans le formulaire
+    const assistanteRaw = fd.get("assistante_id");
+
     const data: OperationFormData = {
       date: String(fd.get("date") || ""),
       client_id: String(fd.get("client_id") || ""),
@@ -110,7 +151,8 @@ export function OperationRowActions({
       compagnie: String(fd.get("compagnie") || ""),
       contrat: String(fd.get("contrat") || ""),
       montant: String(fd.get("montant") || ""),
-      collecte_type: (fd.get("collecte_type") as "new_cash" | "encours") || "new_cash",
+      // Pas de fallback "new_cash" : "" = aucune collecte (acte administratif)
+      collecte_type: String(fd.get("collecte_type") ?? "") as "new_cash" | "encours" | "",
       conseiller_code: String(fd.get("conseiller_code") || ""),
       statut: String(fd.get("statut") || ""),
       support_type: String(fd.get("support_type") || ""),
@@ -118,10 +160,11 @@ export function OperationRowActions({
       validation: fd.get("validation") === "on",
       devoir_conseil: fd.get("devoir_conseil") === "on",
       commentaire: String(fd.get("commentaire") || ""),
-      courrier_pea: String(fd.get("courrier_pea") || "a_faire"),
-      lettre_mission: String(fd.get("lettre_mission") || "a_faire"),
-      conformite: String(fd.get("conformite") || "a_faire"),
+      courrier_pea: String(fd.get("courrier_pea") ?? ""),
+      lettre_mission: String(fd.get("lettre_mission") ?? ""),
+      conformite: String(fd.get("conformite") ?? ""),
       date_facturation: String(fd.get("date_facturation") || ""),
+      assistante_id: assistanteRaw === null ? undefined : String(assistanteRaw),
       lignes: isInvestissement && lignes.length > 0 ? lignes : undefined,
     };
     const result = await updateOperation(operation.id, data);
@@ -167,23 +210,30 @@ export function OperationRowActions({
               <h2 className="text-lg font-semibold">Modifier l&apos;opération</h2>
               <button onClick={() => setEditOpen(false)} className="rounded-sm opacity-70 hover:opacity-100">✕</button>
             </div>
-            <OperationFormInner
-              defaultValues={operation}
-              defaultLignes={defaultLignes}
-              clients={clients}
-              conseillers={conseillers}
-              typeOps={localTypeOps}
-              produits={produits}
-              statuts={statuts}
-              compagnies={localCompagnies}
-              produitsStructures={produitsStructures}
-              onSubmit={handleSubmit}
-              saving={saving}
-              error={error}
-              onCancel={() => setEditOpen(false)}
-              canManageRefs={canManageRefs}
-              onAddRef={handleAddRef}
-            />
+            {loadingFresh ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">Chargement de l&apos;opération…</div>
+            ) : (
+              <OperationFormInner
+                defaultValues={fresh?.operation ?? operation}
+                defaultLignes={fresh ? (fresh.lignes.length > 0 ? fresh.lignes : undefined) : defaultLignes}
+                clients={clients}
+                conseillers={conseillers}
+                typeOps={localTypeOps}
+                produits={produits}
+                statuts={statuts}
+                compagnies={localCompagnies}
+                produitsStructures={produitsStructures}
+                assistantes={fresh?.assistantes}
+                currentUserId={fresh?.currentUserId}
+                statutsControle={fresh?.statutsControle}
+                onSubmit={handleSubmit}
+                saving={saving}
+                error={error}
+                onCancel={() => setEditOpen(false)}
+                canManageRefs={canManageRefs}
+                onAddRef={handleAddRef}
+              />
+            )}
           </div>
         </div>,
         document.body

@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback } from "react";
-import { Input } from "@/components/ui/input";
+import { DebouncedSearchInput } from "@/components/ui/debounced-search-input";
 import { MOIS } from "@/lib/utils";
 
 interface FiltersProps {
@@ -28,7 +28,8 @@ export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, 
       } else {
         params.delete(key);
       }
-      router.push(`${pathname}?${params.toString()}`);
+      // replace + scroll:false : pas d'entrée d'historique par frappe, pas de remontée en haut de page
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [router, pathname, searchParams]
   );
@@ -104,11 +105,10 @@ export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, 
       {/* Recherche client */}
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Recherche client</label>
-        <Input
-          type="search"
+        <DebouncedSearchInput
           placeholder="Nom du client…"
-          defaultValue={searchParams.get("q") ?? ""}
-          onChange={(e) => setParam("q", e.target.value)}
+          initialValue={searchParams.get("q") ?? ""}
+          onCommit={(v) => setParam("q", v)}
           className="w-48"
         />
       </div>
@@ -146,11 +146,10 @@ export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, 
       {/* ISIN */}
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">ISIN</label>
-        <Input
-          type="search"
+        <DebouncedSearchInput
           placeholder="Code ISIN…"
-          defaultValue={searchParams.get("isin") ?? ""}
-          onChange={(e) => setParam("isin", e.target.value)}
+          initialValue={searchParams.get("isin") ?? ""}
+          onCommit={(v) => setParam("isin", v)}
           className="w-36"
         />
       </div>
@@ -190,11 +189,10 @@ export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, 
       {/* Contrat */}
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-pea-gray uppercase tracking-wide">Contrat</label>
-        <Input
-          type="search"
+        <DebouncedSearchInput
           placeholder="N° contrat…"
-          defaultValue={searchParams.get("contrat") ?? ""}
-          onChange={(e) => setParam("contrat", e.target.value)}
+          initialValue={searchParams.get("contrat") ?? ""}
+          onCommit={(v) => setParam("contrat", v)}
           className="w-40"
         />
       </div>

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isInvestmentType } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
 
 type OperationUpdate = Database["public"]["Tables"]["operations"]["Update"];
@@ -16,7 +17,8 @@ export type OperationFormData = {
   compagnie: string;
   contrat: string;
   montant: string;
-  collecte_type: "new_cash" | "encours";
+  /** "" = aucune collecte (acte administratif : changement RIB, clause bénéficiaire…) */
+  collecte_type: "new_cash" | "encours" | "";
   conseiller_code: string;
   statut: string;
   support_type: string;
@@ -28,6 +30,8 @@ export type OperationFormData = {
   lettre_mission?: string;
   conformite?: string;
   date_facturation?: string;
+  /** Assistante pour le compte de laquelle l'opération est saisie. */
+  assistante_id?: string;
   /** Supports d'une opération d'investissement (multi-ISIN). */
   lignes?: LigneFormData[];
 };
@@ -65,7 +69,8 @@ export async function createOperation(formData: OperationFormData) {
     commentaire: formData.commentaire || null,
     date_facturation: formData.date_facturation || null,
     created_by: user?.id ?? null,
-    assistante_id: user?.id ?? null,
+    // Attribution : l'assistante choisie dans le formulaire, sinon l'utilisateur connecté
+    assistante_id: formData.assistante_id || user?.id || null,
   }).select("id").single();
 
   if (error) {
@@ -86,6 +91,7 @@ export async function createOperation(formData: OperationFormData) {
   }
 
   revalidatePath("/operations");
+  revalidatePath("/controles");
   revalidatePath("/");
   return { success: true };
 }
@@ -101,12 +107,19 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     .eq("id", id)
     .single();
 
+  // Comparaison normalisée ("" et null = même absence de valeur)
   const controleChanged =
-    formData.courrier_pea !== undefined && formData.courrier_pea !== existing?.courrier_pea ||
-    formData.lettre_mission !== undefined && formData.lettre_mission !== existing?.lettre_mission ||
-    formData.conformite !== undefined && formData.conformite !== existing?.conformite;
+    (formData.courrier_pea !== undefined && (formData.courrier_pea || null) !== (existing?.courrier_pea || null)) ||
+    (formData.lettre_mission !== undefined && (formData.lettre_mission || null) !== (existing?.lettre_mission || null)) ||
+    (formData.conformite !== undefined && (formData.conformite || null) !== (existing?.conformite || null));
 
   const lignes = (formData.lignes ?? []).filter((l) => l.isin || l.montant);
+
+  // GARDE-FOU : pour un type investissement, le champ « Montant » simple est masqué
+  // dans le formulaire. Si aucun support n'est fourni (popup ouverte depuis une page
+  // qui n'avait pas chargé les operation_lignes), on NE TOUCHE NI au montant, ni à
+  // l'isin, ni aux operation_lignes existantes — sinon on écraserait les données.
+  const investissementSansLignes = isInvestmentType(formData.type_operation) && lignes.length === 0;
 
   // Calcul montant total et isin
   let montantTotal: number | null = formData.montant ? parseFloat(formData.montant) : null;
@@ -124,20 +137,21 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     produit: formData.produit || null,
     compagnie: formData.compagnie || null,
     contrat: formData.contrat || null,
-    montant: montantTotal,
+    montant: investissementSansLignes ? undefined : montantTotal,
     collecte_type: formData.collecte_type || null,
     conseiller_code: formData.conseiller_code || null,
     statut: formData.statut || null,
     support_type: formData.support_type || null,
-    isin: isinValue,
+    isin: investissementSansLignes ? undefined : isinValue,
     validation: formData.validation ?? false,
     devoir_conseil: formData.devoir_conseil ?? false,
     commentaire: formData.commentaire || null,
     date_facturation: formData.date_facturation || null,
+    assistante_id: formData.assistante_id !== undefined ? (formData.assistante_id || null) : undefined,
     updated_at: new Date().toISOString(),
-    courrier_pea: formData.courrier_pea !== undefined ? (formData.courrier_pea || "a_faire") : undefined,
-    lettre_mission: formData.lettre_mission !== undefined ? (formData.lettre_mission || "a_faire") : undefined,
-    conformite: formData.conformite !== undefined ? (formData.conformite || "a_faire") : undefined,
+    courrier_pea: formData.courrier_pea !== undefined ? (formData.courrier_pea || null) : undefined,
+    lettre_mission: formData.lettre_mission !== undefined ? (formData.lettre_mission || null) : undefined,
+    conformite: formData.conformite !== undefined ? (formData.conformite || null) : undefined,
     controle_par_id: controleChanged && user?.id ? user.id : undefined,
     controle_at: controleChanged && user?.id ? new Date().toISOString() : undefined,
   };
@@ -162,13 +176,69 @@ export async function updateOperation(id: string, formData: OperationFormData) {
     if (lignesError) {
       return { error: lignesError.message };
     }
+  } else if (!investissementSansLignes && !isInvestmentType(formData.type_operation)) {
+    // Type administratif : une opération de ce type ne porte pas de supports —
+    // si elle en avait (changement de type), on les retire pour rester cohérent.
+    await supabase.from("operation_lignes").delete().eq("operation_id", id);
   }
 
   revalidatePath("/operations");
+  revalidatePath("/controles");
   revalidatePath("/clients", "layout");
   revalidatePath("/produits-structures", "layout");
   revalidatePath("/");
   return { success: true };
+}
+
+/**
+ * Charge l'opération FRAÎCHE et complète pour la popup d'édition, avec ses
+ * supports (operation_lignes), les valeurs de contrôle dynamiques et la liste
+ * des assistantes. Garantit que l'édition part toujours des données à jour,
+ * quelle que soit la page d'où la popup est ouverte (/operations, /controles,
+ * fiche client, fiche produit).
+ */
+export async function getOperationForEdit(id: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const [
+    { data: operation, error },
+    { data: lignes },
+    { data: statutsControle },
+    { data: assistantes },
+  ] = await Promise.all([
+    supabase
+      .from("operations")
+      .select("*, clients(nom, prenom)")
+      .eq("id", id)
+      .single(),
+    supabase
+      .from("operation_lignes")
+      .select("isin, montant")
+      .eq("operation_id", id)
+      .order("created_at"),
+    supabase
+      .from("ref_statuts_controle")
+      .select("code, label, ordre, champ")
+      .order("ordre"),
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, role")
+      .in("role", ["assistante_commerciale", "assistante_admin", "responsable"])
+      .order("full_name"),
+  ]);
+
+  if (error || !operation) {
+    return { error: error?.message ?? "Opération introuvable" };
+  }
+
+  return {
+    operation,
+    lignes: (lignes ?? []).map((l) => ({ isin: l.isin ?? "", montant: l.montant ?? "" })),
+    statutsControle: statutsControle ?? [],
+    assistantes: assistantes ?? [],
+    currentUserId: user?.id ?? null,
+  };
 }
 
 export async function deleteOperation(id: string) {
@@ -181,6 +251,7 @@ export async function deleteOperation(id: string) {
   }
 
   revalidatePath("/operations");
+  revalidatePath("/controles");
   revalidatePath("/clients", "layout");
   revalidatePath("/produits-structures", "layout");
   revalidatePath("/");

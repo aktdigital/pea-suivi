@@ -60,6 +60,7 @@ export function ClientInfoForm({ client, conseillers, assistantes, operationsCou
     const result = await updateClientInfo(client.id, {
       nom: String(fd.get("nom") || ""),
       prenom: String(fd.get("prenom") || ""),
+      type_personne: String(fd.get("type_personne") || "") as "physique" | "morale",
       email: String(fd.get("email") || ""),
       telephone: String(fd.get("telephone") || ""),
       notes: String(fd.get("notes") || ""),
@@ -132,6 +133,17 @@ export function ClientInfoForm({ client, conseillers, assistantes, operationsCou
         <div className="space-y-1">
           <label className="text-sm font-medium">Prénom</label>
           <Input type="text" name="prenom" defaultValue={client.prenom ?? ""} />
+        </div>
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Type de personne</label>
+          <select
+            name="type_personne"
+            defaultValue={client.type_personne}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option value="physique">Personne physique</option>
+            <option value="morale">Personne morale</option>
+          </select>
         </div>
         <div className="space-y-1">
           <label className="text-sm font-medium">Conseiller</label>

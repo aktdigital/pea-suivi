@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/paginate";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClientInfoForm } from "./client-info-form";
@@ -26,7 +27,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
     { data: refOps },
     { data: refProduits },
     { data: refCompagnies },
-    { data: allClients },
+    allClients,
     { data: produitsStructures },
   ] = await Promise.all([
     supabase
@@ -36,7 +37,7 @@ export default async function ClientDetailPage({ params }: PageProps) {
       .single(),
     supabase
       .from("operations")
-      .select("id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, date_facturation, created_by, assistante_id, created_at, updated_at, client_id, clients(nom, prenom)")
+      .select("id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, date_facturation, created_by, assistante_id, created_at, updated_at, client_id, clients(nom, prenom), operation_lignes(isin, montant)")
       .eq("client_id", id)
       .order("date", { ascending: false }),
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
@@ -49,7 +50,10 @@ export default async function ClientDetailPage({ params }: PageProps) {
     supabase.from("ref_operations").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_produits").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
-    supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
+    // fetchAllRows : contourne le plafond 1000 lignes (la liste s'arrêtait à la lettre T)
+    fetchAllRows((from, to) =>
+      supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom").range(from, to)
+    ),
     supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
   ]);
 

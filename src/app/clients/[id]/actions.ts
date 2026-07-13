@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function updateClientInfo(
   id: string,
-  data: { nom: string; prenom: string; email: string; telephone: string; notes: string; conseiller_code: string; assistante_profile_id: string }
+  data: { nom: string; prenom: string; type_personne?: "physique" | "morale"; email: string; telephone: string; notes: string; conseiller_code: string; assistante_profile_id: string }
 ) {
   const supabase = await createClient();
 
@@ -18,6 +18,8 @@ export async function updateClientInfo(
     .update({
       nom,
       prenom: data.prenom.trim() || null,
+      // Modifiable après création (physique ↔ morale) — demande du 29/06
+      type_personne: data.type_personne === "physique" || data.type_personne === "morale" ? data.type_personne : undefined,
       email: data.email || null,
       telephone: data.telephone || null,
       notes: data.notes || null,

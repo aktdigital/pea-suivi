@@ -4,6 +4,7 @@ import AppShell from "@/components/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/paginate";
 import { formatCurrency, formatDate, isRachat } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 import type { Client, Conseiller } from "@/lib/types";
@@ -51,11 +52,12 @@ export default async function ProduitDetailPage({ params }: PageProps) {
     { data: refOps },
     { data: refProduits },
     { data: refCompagnies },
-    { data: clients },
+    clients,
     { data: produitsStructures },
     { data: refFrequences },
     { data: refStructureurs },
     { data: allForDistinct },
+    { data: profilsAssistantes },
   ] = await Promise.all([
     supabase
       .from("produits_structures")
@@ -72,11 +74,15 @@ export default async function ProduitDetailPage({ params }: PageProps) {
     supabase.from("ref_operations").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_produits").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
-    supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
+    // fetchAllRows : contourne le plafond 1000 lignes (la liste s'arrêtait à la lettre T)
+    fetchAllRows((from, to) =>
+      supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom").range(from, to)
+    ),
     supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
     supabase.from("ref_frequences").select("id, label, ordre").order("ordre"),
     supabase.from("ref_structureurs").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("produits_structures").select("mecanisme, duree, eligible_contrats").eq("active", true),
+    supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "assistante_admin", "responsable"]).order("full_name"),
   ]);
 
   if (!produit) notFound();
@@ -203,6 +209,8 @@ export default async function ProduitDetailPage({ params }: PageProps) {
                 statuts={refStatuts ?? []}
                 compagnies={refCompagnies ?? []}
                 produitsStructures={produitsStructures ?? []}
+                assistantes={profilsAssistantes ?? []}
+                currentUserId={user?.id ?? null}
                 defaultIsin={decodedIsin}
                 canManageRefs={canManageRefs}
               />

@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import AppShell from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/paginate";
 import { formatCurrency, isRachat } from "@/lib/utils";
 import { OperationsFilters } from "@/components/operations/operations-filters";
 import { OperationsTable } from "@/components/operations/operations-table";
@@ -32,10 +33,9 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     { data: refOps },
     { data: refProduits },
     { data: refCompagnies },
-    { data: clients },
+    clients,
     { data: produitsStructures },
-    { data: assistantes },
-    { data: assistantesComm },
+    { data: profilsAssistantes },
     { data: refSupports },
   ] = await Promise.all([
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
@@ -43,12 +43,17 @@ export default async function OperationsPage({ searchParams }: PageProps) {
     supabase.from("ref_operations").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_produits").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
-    supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
+    // fetchAllRows : contourne le plafond 1000 lignes (la liste s'arrêtait à la lettre T)
+    fetchAllRows((from, to) =>
+      supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom").range(from, to)
+    ),
     supabase.from("produits_structures").select("isin, nom_produit").eq("active", true).order("nom_produit"),
-    supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "assistante_admin"]).order("full_name"),
-    supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "responsable"]).order("full_name"),
+    // Liste unifiée : saisie possible par une assistante commerciale, l'assistante admin ou la responsable
+    supabase.from("profiles").select("id, full_name, email, role").in("role", ["assistante_commerciale", "assistante_admin", "responsable"]).order("full_name"),
     supabase.from("ref_supports").select("id, label, ordre, active").eq("active", true).order("ordre"),
   ]);
+
+  const assistantes = profilsAssistantes ?? [];
 
   // Calcul du rôle pour canManageRefs
   const { data: { user } } = await supabase.auth.getUser();
@@ -124,6 +129,8 @@ export default async function OperationsPage({ searchParams }: PageProps) {
               statuts={refStatuts ?? []}
               compagnies={refCompagnies ?? []}
               produitsStructures={produitsStructures ?? []}
+              assistantes={assistantes}
+              currentUserId={user?.id ?? null}
               canManageRefs={canManageRefs}
             />
           </div>
@@ -149,8 +156,8 @@ export default async function OperationsPage({ searchParams }: PageProps) {
           conseillers={conseillers ?? []}
           statuts={refStatuts ?? []}
           typeOps={refOps ?? []}
-          assistantes={assistantes ?? []}
-          assistantesCommerciales={assistantesComm ?? []}
+          assistantes={assistantes}
+          assistantesCommerciales={assistantes}
           compagnies={refCompagnies ?? []}
           supports={refSupports ?? []}
         />

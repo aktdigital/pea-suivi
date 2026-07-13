@@ -17,6 +17,10 @@ interface OperationFormProps {
   statuts: { id: number; label: string }[];
   compagnies: { id: number; label: string }[];
   produitsStructures: { isin: string; nom_produit: string }[];
+  /** Assistantes sélectionnables pour l'attribution (« opération comptée pour ») */
+  assistantes?: { id: string; full_name: string | null; email: string | null }[];
+  /** Utilisateur connecté — pré-sélection de l'assistante */
+  currentUserId?: string | null;
   defaultIsin?: string;
   canManageRefs?: boolean;
 }
@@ -29,6 +33,8 @@ export function OperationFormButton({
   statuts,
   compagnies,
   produitsStructures,
+  assistantes,
+  currentUserId,
   defaultIsin,
   canManageRefs = false,
 }: OperationFormProps) {
@@ -70,6 +76,8 @@ export function OperationFormButton({
       .map((isin, i) => ({ isin, montant: ligneMontants[i] ?? "" }))
       .filter((l) => l.isin !== "" || l.montant !== "");
 
+    const assistanteRaw = fd.get("assistante_id");
+
     const data: OperationFormData = {
       date: String(fd.get("date") || ""),
       client_id: String(fd.get("client_id") || ""),
@@ -78,7 +86,8 @@ export function OperationFormButton({
       compagnie: String(fd.get("compagnie") || ""),
       contrat: String(fd.get("contrat") || ""),
       montant: String(fd.get("montant") || ""),
-      collecte_type: (fd.get("collecte_type") as "new_cash" | "encours") || "new_cash",
+      // Pas de fallback "new_cash" : le choix est explicite (radio requise)
+      collecte_type: String(fd.get("collecte_type") ?? "") as "new_cash" | "encours" | "",
       conseiller_code: String(fd.get("conseiller_code") || ""),
       statut: String(fd.get("statut") || ""),
       support_type: String(fd.get("support_type") || ""),
@@ -87,6 +96,7 @@ export function OperationFormButton({
       devoir_conseil: fd.get("devoir_conseil") === "on",
       commentaire: String(fd.get("commentaire") || ""),
       date_facturation: String(fd.get("date_facturation") || ""),
+      assistante_id: assistanteRaw === null ? undefined : String(assistanteRaw),
       lignes: isInvestissement && lignes.length > 0 ? lignes : undefined,
     };
 
@@ -131,6 +141,8 @@ export function OperationFormButton({
               statuts={statuts}
               compagnies={localCompagnies}
               produitsStructures={produitsStructures}
+              assistantes={assistantes}
+              currentUserId={currentUserId}
               onSubmit={handleSubmit}
               saving={saving}
               error={error}

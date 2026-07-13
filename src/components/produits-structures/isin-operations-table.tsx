@@ -135,7 +135,7 @@ export function IsinOperationsTable({
               const clientName = op.clients
                 ? `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()
                 : null;
-              const rowClass = `border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`;
+              const rowClass = `border-b border-pea-gray/20 last:border-0 hover:bg-pea-blue/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream"}`;
 
               // Construire un objet Operation-compatible pour OperationClickableRow
               const operationObj = {

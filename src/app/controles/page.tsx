@@ -2,7 +2,9 @@ import { Suspense } from "react";
 import Link from "next/link";
 import AppShell from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
-import { formatDate } from "@/lib/utils";
+import { fetchAllRows } from "@/lib/supabase/paginate";
+import { formatCurrency, formatDate, statutBgClass } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { ControleCell } from "@/components/controles/controle-cell";
 import { ControleFiltersClient } from "@/components/controles/controle-filters";
 import { ControleStatutsManager } from "@/components/controles/controle-statuts-manager";
@@ -22,7 +24,7 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     { data: refStatutsControle },
     { data: conseillers },
     { data: refCompagnies },
-    { data: clients },
+    clients,
     { data: refOps },
     { data: refProduits },
     { data: refStatuts },
@@ -31,7 +33,10 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     supabase.from("ref_statuts_controle").select("code, label, ordre, champ").order("ordre"),
     supabase.from("conseillers").select("code, full_name, email, active").eq("active", true).order("code"),
     supabase.from("ref_compagnies").select("id, label, ordre, active").eq("active", true).order("ordre"),
-    supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom"),
+    // fetchAllRows : contourne le plafond 1000 lignes (la liste s'arrêtait à la lettre T)
+    fetchAllRows((from, to) =>
+      supabase.from("clients").select("id, nom, prenom, type_personne, conseiller_code, email, telephone, notes, created_at, updated_at").order("nom").range(from, to)
+    ),
     supabase.from("ref_operations").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_produits").select("id, label, ordre, active").eq("active", true).order("ordre"),
     supabase.from("ref_statuts").select("id, label, ordre, active").eq("active", true).order("ordre"),
@@ -51,32 +56,46 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     canManageRefs = ["admin", "responsable", "assistante_admin"].includes(role);
   }
 
-  // Requête opérations avec jointure clients
-  let query = supabase
-    .from("operations")
-    .select(`
-      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, date_facturation, created_at, updated_at, client_id,
-      clients(nom, prenom)
-    `)
-    .order("date", { ascending: false });
+  // Requête opérations avec jointure clients + supports (operation_lignes)
+  function buildOpsQuery(from: number, to: number) {
+    let query = supabase
+      .from("operations")
+      .select(`
+        id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, date_facturation, created_at, updated_at, client_id,
+        clients(nom, prenom),
+        operation_lignes(isin, montant)
+      `)
+      .order("date", { ascending: false });
 
-  if (params.conseiller) query = query.eq("conseiller_code", params.conseiller);
-  if (params.compagnie) query = query.eq("compagnie", params.compagnie);
-  if (params.contrat) query = query.ilike("contrat", `%${params.contrat}%`);
-  if (params.courrier_pea) query = query.eq("courrier_pea", params.courrier_pea);
-  if (params.lettre_mission) query = query.eq("lettre_mission", params.lettre_mission);
-  if (params.conformite) query = query.eq("conformite", params.conformite);
-  if (params.mois) {
-    const [year, month] = params.mois.split("-");
-    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-    query = query.gte("date", `${year}-${month}-01`).lte("date", `${year}-${month}-${lastDay}`);
+    if (params.conseiller) query = query.eq("conseiller_code", params.conseiller);
+    if (params.compagnie) query = query.eq("compagnie", params.compagnie);
+    if (params.contrat) query = query.ilike("contrat", `%${params.contrat}%`);
+    if (params.courrier_pea) query = query.eq("courrier_pea", params.courrier_pea);
+    if (params.lettre_mission) query = query.eq("lettre_mission", params.lettre_mission);
+    if (params.conformite) query = query.eq("conformite", params.conformite);
+    if (params.mois) {
+      const [year, month] = params.mois.split("-");
+      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+      query = query.gte("date", `${year}-${month}-01`).lte("date", `${year}-${month}-${lastDay}`);
+    }
+    return query.range(from, to);
   }
 
-  const { data: operations, error } = await query;
+  type OpRow = Operation & {
+    clients?: { nom: string; prenom: string | null } | null;
+    operation_lignes?: { isin: string | null; montant: number | null }[];
+  };
 
-  type OpRow = Operation & { clients?: { nom: string; prenom: string | null } | null };
+  // fetchAllRows : contourne le plafond 1000 lignes de PostgREST
+  let operations: OpRow[] = [];
+  let error: { message: string } | null = null;
+  try {
+    operations = (await fetchAllRows((from, to) => buildOpsQuery(from, to))) as unknown as OpRow[];
+  } catch (e) {
+    error = { message: e instanceof Error ? e.message : "inconnue" };
+  }
 
-  let filtered: OpRow[] = (operations ?? []) as unknown as OpRow[];
+  let filtered: OpRow[] = operations;
 
   // Filtre recherche client en mémoire
   if (params.q) {
@@ -131,6 +150,9 @@ export default async function ControlesPage({ searchParams }: PageProps) {
                   <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Client</th>
                   <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Type</th>
                   <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Compagnie / Contrat</th>
+                  <th className="text-right px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Montant</th>
+                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">ISIN</th>
+                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Statut</th>
                   <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Conseiller</th>
                   <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Courrier PEA</th>
                   <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Lettre mission</th>
@@ -138,10 +160,20 @@ export default async function ControlesPage({ searchParams }: PageProps) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((op, i) => (
+                {filtered.map((op) => {
+                  const lignes = op.operation_lignes ?? [];
+                  // Affichage ISIN : identique à l'onglet Opérations (N supports / ISIN unique / legacy)
+                  const isinDisplay = lignes.length > 1
+                    ? `${lignes.length} supports`
+                    : lignes.length === 1
+                      ? (lignes[0].isin ?? "—")
+                      : (op.isin ?? "—");
+                  const defaultLignes = lignes.map((l) => ({ isin: l.isin ?? "", montant: l.montant ?? "" }));
+                  return (
                   <OperationClickableRow
                     key={op.id}
                     operation={op}
+                    defaultLignes={defaultLignes.length > 0 ? defaultLignes : undefined}
                     clients={(clients ?? []) as Client[]}
                     conseillers={(conseillers ?? []) as Conseiller[]}
                     typeOps={refOps ?? []}
@@ -150,7 +182,7 @@ export default async function ControlesPage({ searchParams }: PageProps) {
                     compagnies={refCompagnies ?? []}
                     produitsStructures={produitsStructures ?? []}
                     canManageRefs={canManageRefs}
-                    className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-teal/5 ${i % 2 === 0 ? "bg-white" : "bg-pea-cream/40"}`}
+                    className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-blue/5 ${statutBgClass(op.statut)}`}
                   >
                     <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -169,6 +201,11 @@ export default async function ControlesPage({ searchParams }: PageProps) {
                     <td className="px-3 py-2 whitespace-nowrap">
                       <div>{op.compagnie ?? "—"}</div>
                       {op.contrat && <div className="text-xs text-muted-foreground">{op.contrat}</div>}
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap font-medium">{formatCurrency(op.montant)}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{isinDisplay}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {op.statut ? <Badge variant="outline">{op.statut}</Badge> : "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">{op.conseiller_code ?? "—"}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
@@ -196,7 +233,8 @@ export default async function ControlesPage({ searchParams }: PageProps) {
                       />
                     </td>
                   </OperationClickableRow>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

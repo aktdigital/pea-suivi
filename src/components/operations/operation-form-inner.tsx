@@ -20,6 +20,12 @@ export interface OperationFormInnerProps {
   statuts: { id: number; label: string }[];
   compagnies: { id: number; label: string }[];
   produitsStructures: { isin: string; nom_produit: string }[];
+  /** Assistantes sélectionnables pour l'attribution de l'opération */
+  assistantes?: { id: string; full_name: string | null; email: string | null }[];
+  /** Utilisateur connecté (pré-sélection de l'assistante à la création) */
+  currentUserId?: string | null;
+  /** Valeurs de contrôle dynamiques (ref_statuts_controle) — fallback : liste codée en dur */
+  statutsControle?: { code: string; label: string; champ: string | null }[];
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
   saving: boolean;
   error: string | null;
@@ -97,6 +103,9 @@ export function OperationFormInner({
   statuts,
   compagnies,
   produitsStructures,
+  assistantes,
+  currentUserId,
+  statutsControle,
   onSubmit,
   saving,
   error,
@@ -105,6 +114,8 @@ export function OperationFormInner({
   onAddRef,
   submitLabel = "Enregistrer",
 }: OperationFormInnerProps) {
+  // Mode édition = une opération existante est fournie
+  const isEdit = Boolean(defaultValues?.id);
   const today = new Date().toISOString().split("T")[0];
   // Local copies so newly added values appear immediately in the select
   const [localTypeOps, setLocalTypeOps] = useState(typeOps);
@@ -276,6 +287,23 @@ export function OperationFormInner({
           </select>
         </div>
 
+        {/* Attribution : pour le compte de quelle assistante l'opération est saisie */}
+        {assistantes && assistantes.length > 0 && (
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Assistante (opération comptée pour)</label>
+            <select
+              name="assistante_id"
+              defaultValue={defaultValues?.assistante_id ?? currentUserId ?? ""}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="">— Aucune —</option>
+              {assistantes.map((a) => (
+                <option key={a.id} value={a.id}>{a.full_name ?? a.email ?? a.id}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="space-y-1">
           <label className="text-sm font-medium">Statut</label>
           <select
@@ -377,17 +405,23 @@ export function OperationFormInner({
         </div>
       )}
 
-      <div className="flex gap-6">
+      <div className="flex gap-6 flex-wrap">
         <div className="space-y-1">
-          <label className="text-sm font-medium">Collecte</label>
+          <label className="text-sm font-medium">Collecte *</label>
           <div className="flex gap-4">
+            {/* Pas de pré-cochage à la création : le choix doit être explicite.
+                « Aucune » = actes administratifs (changement RIB, clause bénéficiaire…) */}
             <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="radio" name="collecte_type" value="new_cash" defaultChecked={defaultValues?.collecte_type === "new_cash" || !defaultValues?.collecte_type} />
+              <input type="radio" name="collecte_type" value="new_cash" required defaultChecked={defaultValues?.collecte_type === "new_cash"} />
               New Cash
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="radio" name="collecte_type" value="encours" defaultChecked={defaultValues?.collecte_type === "encours"} />
               Encours
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="radio" name="collecte_type" value="" defaultChecked={isEdit && !defaultValues?.collecte_type} />
+              Aucune
             </label>
           </div>
         </div>
@@ -454,42 +488,37 @@ export function OperationFormInner({
       <div className="border-t pt-4 space-y-3">
         <h3 className="text-sm font-semibold text-muted-foreground">Contrôles administratifs (Michèle)</h3>
         <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Courrier PEA</label>
-            <select
-              name="courrier_pea"
-              defaultValue={defaultValues?.courrier_pea ?? "a_faire"}
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {STATUTS_CONTROLE.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Lettre mission</label>
-            <select
-              name="lettre_mission"
-              defaultValue={defaultValues?.lettre_mission ?? "a_faire"}
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {STATUTS_CONTROLE.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Conformité</label>
-            <select
-              name="conformite"
-              defaultValue={defaultValues?.conformite ?? "a_faire"}
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {STATUTS_CONTROLE.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          </div>
+          {([
+            { name: "courrier_pea", label: "Courrier PEA", value: defaultValues?.courrier_pea ?? null },
+            { name: "lettre_mission", label: "Lettre mission", value: defaultValues?.lettre_mission ?? null },
+            { name: "conformite", label: "Conformité", value: defaultValues?.conformite ?? null },
+          ] as const).map((champ) => {
+            // Valeurs dynamiques (ref_statuts_controle) filtrées pour ce champ ;
+            // fallback sur la liste codée en dur si non fournies.
+            const options = statutsControle && statutsControle.length > 0
+              ? statutsControle
+                  .filter((s) => s.champ == null || s.champ === champ.name)
+                  .map((s) => ({ value: s.code, label: s.label }))
+              : STATUTS_CONTROLE.map((s) => ({ value: s.value as string, label: s.label }));
+            // Préserve une valeur actuelle inconnue de la liste (évite de l'écraser en enregistrant)
+            const valeurInconnue = champ.value && !options.some((o) => o.value === champ.value);
+            return (
+              <div key={champ.name} className="space-y-1">
+                <label className="text-sm font-medium">{champ.label}</label>
+                <select
+                  name={champ.name}
+                  defaultValue={champ.value ?? ""}
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="">—</option>
+                  {valeurInconnue && <option value={champ.value!}>{champ.value}</option>}
+                  {options.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
         </div>
       </div>
 

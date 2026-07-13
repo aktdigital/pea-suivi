@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/paginate";
 import { OperationRow } from "./operation-row";
 import type { Client, Conseiller, Operation } from "@/lib/types";
 
@@ -52,41 +53,47 @@ export async function OperationsTable({
 }: OperationsTableProps) {
   const supabase = await createClient();
 
-  let query = supabase
-    .from("operations")
-    .select(`
-      id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, devoir_conseil, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
-      clients(nom, prenom),
-      created_by_profile:profiles!operations_created_by_fkey(id, full_name, email),
-      operation_lignes(isin, montant)
-    `)
-    .order("date", { ascending: false });
+  function buildQuery(from: number, to: number) {
+    let query = supabase
+      .from("operations")
+      .select(`
+        id, date, date_fin, type_operation, produit, compagnie, contrat, montant, collecte_type, conseiller_code, created_by, assistante_id, statut, support_type, isin, validation, devoir_conseil, commentaire, courrier_pea, lettre_mission, conformite, controle_par_id, controle_at, created_at, updated_at, client_id,
+        clients(nom, prenom),
+        created_by_profile:profiles!operations_created_by_fkey(id, full_name, email),
+        operation_lignes(isin, montant)
+      `)
+      .order("date", { ascending: false });
 
-  // Filtre période
-  if (mois) {
-    const [year, month] = mois.split("-");
-    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
-    query = query
-      .gte("date", `${year}-${month}-01`)
-      .lte("date", `${year}-${month}-${lastDay}`);
+    // Filtre période
+    if (mois) {
+      const [year, month] = mois.split("-");
+      const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+      query = query
+        .gte("date", `${year}-${month}-01`)
+        .lte("date", `${year}-${month}-${lastDay}`);
+    }
+
+    if (conseiller) query = query.eq("conseiller_code", conseiller);
+    if (statut) query = query.eq("statut", statut);
+    if (type) query = query.eq("type_operation", type);
+    if (par) query = query.eq("created_by", par);
+    if (isin) query = query.ilike("isin", `%${isin}%`);
+    if (compagnie) query = query.eq("compagnie", compagnie);
+    if (assistante) query = query.eq("assistante_id", assistante);
+    if (support) query = query.eq("support_type", support);
+    if (contrat) query = query.ilike("contrat", `%${contrat}%`);
+
+    return query.range(from, to);
   }
 
-  if (conseiller) query = query.eq("conseiller_code", conseiller);
-  if (statut) query = query.eq("statut", statut);
-  if (type) query = query.eq("type_operation", type);
-  if (par) query = query.eq("created_by", par);
-  if (isin) query = query.ilike("isin", `%${isin}%`);
-  if (compagnie) query = query.eq("compagnie", compagnie);
-  if (assistante) query = query.eq("assistante_id", assistante);
-  if (support) query = query.eq("support_type", support);
-  if (contrat) query = query.ilike("contrat", `%${contrat}%`);
-
-  const { data: operations, error } = await query;
-
-  if (error) {
+  // fetchAllRows : contourne le plafond 1000 lignes de PostgREST
+  let operations: unknown[];
+  try {
+    operations = await fetchAllRows((from, to) => buildQuery(from, to));
+  } catch (e) {
     return (
       <div className="text-sm text-destructive p-4 border rounded-md">
-        Erreur lors du chargement des opérations : {error.message}
+        Erreur lors du chargement des opérations : {e instanceof Error ? e.message : "inconnue"}
       </div>
     );
   }
@@ -97,7 +104,7 @@ export async function OperationsTable({
     operation_lignes?: OperationLigne[];
   };
 
-  let filtered: OpWithClient[] = (operations ?? []) as OpWithClient[];
+  let filtered: OpWithClient[] = operations as OpWithClient[];
 
   // Filtre recherche client côté serveur
   if (q) {
