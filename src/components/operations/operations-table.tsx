@@ -1,7 +1,29 @@
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/paginate";
 import { OperationRow } from "./operation-row";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
 import type { Client, Conseiller, Operation } from "@/lib/types";
+
+const PAGE_SIZE = 20;
+
+/** Colonnes masquables du tableau (menu « Colonnes ») — Date et Client restent toujours visibles */
+const TOGGLE_COLUMNS = [
+  { key: "date_fin", label: "Date fin" },
+  { key: "operation", label: "Opération" },
+  { key: "produit", label: "Produit" },
+  { key: "compagnie", label: "Compagnie / Contrat" },
+  { key: "montant", label: "Montant" },
+  { key: "collecte", label: "Collecte" },
+  { key: "conseiller", label: "Conseiller" },
+  { key: "par", label: "Par" },
+  { key: "statut", label: "Statut" },
+  { key: "support", label: "Support" },
+  { key: "isin", label: "ISIN" },
+  { key: "valide", label: "Validé" },
+  { key: "devoir", label: "Devoir conseil" },
+  { key: "commentaire", label: "Commentaire" },
+];
 
 type CreatedByProfile = { id: string; full_name: string | null; email: string | null } | null;
 
@@ -19,6 +41,7 @@ interface OperationsTableProps {
   assistante?: string;
   support?: string;
   contrat?: string;
+  page?: string;
   clients: Client[];
   conseillers: Conseiller[];
   typeOps: { id: number; label: string }[];
@@ -42,6 +65,7 @@ export async function OperationsTable({
   assistante,
   support,
   contrat,
+  page,
   clients,
   conseillers,
   typeOps,
@@ -126,48 +150,85 @@ export async function OperationsTable({
     );
   }
 
+  // Pagination (après filtrage en mémoire)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageNum = Math.min(Math.max(1, parseInt(page ?? "1", 10) || 1), totalPages);
+  const start = (pageNum - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(start, start + PAGE_SIZE);
+
+  // Liens de pagination : préservent tous les filtres actifs
+  function buildHref(p: number): string {
+    const sp = new URLSearchParams();
+    if (mois) sp.set("mois", mois);
+    if (conseiller) sp.set("conseiller", conseiller);
+    if (statut) sp.set("statut", statut);
+    if (type) sp.set("type", type);
+    if (q) sp.set("q", q);
+    if (par) sp.set("par", par);
+    if (isin) sp.set("isin", isin);
+    if (compagnie) sp.set("compagnie", compagnie);
+    if (assistante) sp.set("assistante", assistante);
+    if (support) sp.set("support", support);
+    if (contrat) sp.set("contrat", contrat);
+    if (p > 1) sp.set("page", String(p));
+    const qs = sp.toString();
+    return `/operations${qs ? `?${qs}` : ""}`;
+  }
+
+  const thCls = "text-left px-2 py-1.5 font-medium text-pea-blue uppercase tracking-wide text-[11px] whitespace-nowrap";
+
   return (
-    <div className="rounded-lg border border-pea-gray/20 overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-pea-blue/5">
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Date</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Date fin</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Opération</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Client</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Produit</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Compagnie / Contrat</th>
-            <th className="text-right px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Montant</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Collecte</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Conseiller</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Par</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Statut</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Support</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">ISIN</th>
-            <th className="text-center px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Validé</th>
-            <th className="text-center px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Devoir conseil</th>
-            <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Commentaire</th>
-            <th className="px-3 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((op, i) => (
-            <OperationRow
-              key={op.id}
-              op={op}
-              index={i}
-              clients={clients}
-              conseillers={conseillers}
-              typeOps={typeOps}
-              produits={produits}
-              statuts={statuts}
-              compagnies={compagnies}
-              produitsStructures={produitsStructures}
-              canManageRefs={canManageRefs}
-            />
-          ))}
-        </tbody>
-      </table>
+    <div>
+      <DataTableShell storageKey="pea-cols-operations" columns={TOGGLE_COLUMNS}>
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="border-b bg-pea-blue/5">
+              <th className={thCls}>Date</th>
+              <th className={thCls} data-col="date_fin">Date fin</th>
+              <th className={thCls} data-col="operation">Opération</th>
+              <th className={thCls}>Client</th>
+              <th className={thCls} data-col="produit">Produit</th>
+              <th className={thCls} data-col="compagnie">Compagnie / Contrat</th>
+              <th className={`${thCls} text-right`} data-col="montant">Montant</th>
+              <th className={thCls} data-col="collecte">Collecte</th>
+              <th className={thCls} data-col="conseiller">Cons.</th>
+              <th className={thCls} data-col="par">Par</th>
+              <th className={thCls} data-col="statut">Statut</th>
+              <th className={thCls} data-col="support">Support</th>
+              <th className={thCls} data-col="isin">ISIN</th>
+              <th className={`${thCls} text-center`} data-col="valide">Validé</th>
+              <th className={`${thCls} text-center`} data-col="devoir">Devoir</th>
+              <th className={thCls} data-col="commentaire">Commentaire</th>
+              <th className="px-2 py-1.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((op, i) => (
+              <OperationRow
+                key={op.id}
+                op={op}
+                index={i}
+                clients={clients}
+                conseillers={conseillers}
+                typeOps={typeOps}
+                produits={produits}
+                statuts={statuts}
+                compagnies={compagnies}
+                produitsStructures={produitsStructures}
+                canManageRefs={canManageRefs}
+              />
+            ))}
+          </tbody>
+        </table>
+      </DataTableShell>
+      <TablePagination
+        page={pageNum}
+        totalPages={totalPages}
+        total={filtered.length}
+        from={start + 1}
+        to={Math.min(start + PAGE_SIZE, filtered.length)}
+        buildHref={buildHref}
+      />
     </div>
   );
 }

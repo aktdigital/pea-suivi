@@ -12,7 +12,7 @@ import { TrendingUp, Banknote, RefreshCw, AlertCircle } from "lucide-react";
 import type { Client, Conseiller } from "@/lib/types";
 
 interface PageProps {
-  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string; par?: string; isin?: string; compagnie?: string; assistante?: string; support?: string; contrat?: string }>;
+  searchParams: Promise<{ mois?: string; conseiller?: string; statut?: string; type?: string; q?: string; par?: string; isin?: string; compagnie?: string; assistante?: string; support?: string; contrat?: string; page?: string }>;
 }
 
 export default async function OperationsPage({ searchParams }: PageProps) {
@@ -176,6 +176,7 @@ export default async function OperationsPage({ searchParams }: PageProps) {
             assistante={params.assistante}
             support={params.support}
             contrat={params.contrat}
+            page={params.page}
             clients={(clients ?? []) as Client[]}
             conseillers={(conseillers ?? []) as Conseiller[]}
             typeOps={refOps ?? []}

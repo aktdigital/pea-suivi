@@ -74,3 +74,26 @@ body {
 .font-serif {
   font-family: var(--font-bodoni), Georgia, "Times New Roman", serif;
 }
+
+/* Barre de défilement horizontale des tableaux : toujours visible et cliquable
+   (indispensable à la souris sans trackpad — macOS/certains navigateurs la masquent) */
+.pea-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #9eb4c6 #f1efec;
+}
+.pea-scrollbar::-webkit-scrollbar {
+  height: 11px;
+  width: 11px;
+}
+.pea-scrollbar::-webkit-scrollbar-track {
+  background: #f1efec;
+  border-radius: 6px;
+}
+.pea-scrollbar::-webkit-scrollbar-thumb {
+  background: #9eb4c6;
+  border-radius: 6px;
+  border: 2px solid #f1efec;
+}
+.pea-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #284460;
+}

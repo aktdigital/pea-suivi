@@ -9,11 +9,25 @@ import { ControleCell } from "@/components/controles/controle-cell";
 import { ControleFiltersClient } from "@/components/controles/controle-filters";
 import { ControleStatutsManager } from "@/components/controles/controle-statuts-manager";
 import { OperationClickableRow } from "@/components/operations/operation-clickable-row";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { TablePagination } from "@/components/ui/table-pagination";
 import type { Operation, Client, Conseiller } from "@/lib/types";
 import { ShieldCheck } from "lucide-react";
 
+const PAGE_SIZE = 20;
+
+/** Colonnes masquables (Date, Client et les 3 contrôles restent toujours visibles) */
+const TOGGLE_COLUMNS = [
+  { key: "type", label: "Type" },
+  { key: "compagnie", label: "Compagnie / Contrat" },
+  { key: "montant", label: "Montant" },
+  { key: "isin", label: "ISIN" },
+  { key: "statut", label: "Statut" },
+  { key: "conseiller", label: "Conseiller" },
+];
+
 interface PageProps {
-  searchParams: Promise<{ q?: string; conseiller?: string; mois?: string; compagnie?: string; contrat?: string; courrier_pea?: string; lettre_mission?: string; conformite?: string }>;
+  searchParams: Promise<{ q?: string; conseiller?: string; mois?: string; compagnie?: string; contrat?: string; courrier_pea?: string; lettre_mission?: string; conformite?: string; page?: string }>;
 }
 
 export default async function ControlesPage({ searchParams }: PageProps) {
@@ -108,6 +122,30 @@ export default async function ControlesPage({ searchParams }: PageProps) {
     });
   }
 
+  // Pagination (après filtrage)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageNum = Math.min(Math.max(1, parseInt(params.page ?? "1", 10) || 1), totalPages);
+  const start = (pageNum - 1) * PAGE_SIZE;
+  const pageRows = filtered.slice(start, start + PAGE_SIZE);
+
+  // Liens de pagination : préservent les filtres actifs
+  function buildHref(p: number): string {
+    const sp = new URLSearchParams();
+    if (params.mois) sp.set("mois", params.mois);
+    if (params.q) sp.set("q", params.q);
+    if (params.compagnie) sp.set("compagnie", params.compagnie);
+    if (params.conseiller) sp.set("conseiller", params.conseiller);
+    if (params.contrat) sp.set("contrat", params.contrat);
+    if (params.courrier_pea) sp.set("courrier_pea", params.courrier_pea);
+    if (params.lettre_mission) sp.set("lettre_mission", params.lettre_mission);
+    if (params.conformite) sp.set("conformite", params.conformite);
+    if (p > 1) sp.set("page", String(p));
+    const qs = sp.toString();
+    return `/controles${qs ? `?${qs}` : ""}`;
+  }
+
+  const thCls = "text-left px-2 py-1.5 font-medium text-pea-blue uppercase tracking-wide text-[11px] whitespace-nowrap";
+
   return (
     <AppShell>
       <div className="space-y-6">
@@ -142,101 +180,111 @@ export default async function ControlesPage({ searchParams }: PageProps) {
             <p className="text-sm">Aucune opération pour ces filtres.</p>
           </div>
         ) : (
-          <div className="rounded-lg border border-pea-gray/20 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-pea-blue/5">
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Date</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Client</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Type</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Compagnie / Contrat</th>
-                  <th className="text-right px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Montant</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">ISIN</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Statut</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Conseiller</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Courrier PEA</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Lettre mission</th>
-                  <th className="text-left px-3 py-2 font-medium text-pea-blue uppercase tracking-wide text-xs whitespace-nowrap">Conformité</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((op) => {
-                  const lignes = op.operation_lignes ?? [];
-                  // Affichage ISIN : identique à l'onglet Opérations (N supports / ISIN unique / legacy)
-                  const isinDisplay = lignes.length > 1
-                    ? `${lignes.length} supports`
-                    : lignes.length === 1
-                      ? (lignes[0].isin ?? "—")
-                      : (op.isin ?? "—");
-                  const defaultLignes = lignes.map((l) => ({ isin: l.isin ?? "", montant: l.montant ?? "" }));
-                  return (
-                  <OperationClickableRow
-                    key={op.id}
-                    operation={op}
-                    defaultLignes={defaultLignes.length > 0 ? defaultLignes : undefined}
-                    clients={(clients ?? []) as Client[]}
-                    conseillers={(conseillers ?? []) as Conseiller[]}
-                    typeOps={refOps ?? []}
-                    produits={refProduits ?? []}
-                    statuts={refStatuts ?? []}
-                    compagnies={refCompagnies ?? []}
-                    produitsStructures={produitsStructures ?? []}
-                    canManageRefs={canManageRefs}
-                    className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-blue/5 ${statutBgClass(op.statut)}`}
-                  >
-                    <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {op.clients && op.client_id ? (
-                        <Link
-                          href={`/clients/${op.client_id}`}
-                          className="hover:underline hover:text-pea-teal transition-colors"
-                        >
-                          {`${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()}
-                        </Link>
-                      ) : op.clients ? (
-                        `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()
-                      ) : "—"}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <div>{op.compagnie ?? "—"}</div>
-                      {op.contrat && <div className="text-xs text-muted-foreground">{op.contrat}</div>}
-                    </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap font-medium">{formatCurrency(op.montant)}</td>
-                    <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{isinDisplay}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {op.statut ? <Badge variant="outline">{op.statut}</Badge> : "—"}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{op.conseiller_code ?? "—"}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <ControleCell
-                        opId={op.id}
-                        champ="courrier_pea"
-                        valeurActuelle={op.courrier_pea}
-                        statutsControle={statuts}
-                      />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <ControleCell
-                        opId={op.id}
-                        champ="lettre_mission"
-                        valeurActuelle={op.lettre_mission}
-                        statutsControle={statuts}
-                      />
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <ControleCell
-                        opId={op.id}
-                        champ="conformite"
-                        valeurActuelle={op.conformite}
-                        statutsControle={statuts}
-                      />
-                    </td>
-                  </OperationClickableRow>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div>
+            <DataTableShell storageKey="pea-cols-controles" columns={TOGGLE_COLUMNS}>
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b bg-pea-blue/5">
+                    <th className={thCls}>Date</th>
+                    <th className={thCls}>Client</th>
+                    <th className={thCls} data-col="type">Type</th>
+                    <th className={thCls} data-col="compagnie">Compagnie / Contrat</th>
+                    <th className={`${thCls} text-right`} data-col="montant">Montant</th>
+                    <th className={thCls} data-col="isin">ISIN</th>
+                    <th className={thCls} data-col="statut">Statut</th>
+                    <th className={thCls} data-col="conseiller">Cons.</th>
+                    <th className={thCls}>Courrier PEA</th>
+                    <th className={thCls}>Lettre mission</th>
+                    <th className={thCls}>Conformité</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((op) => {
+                    const lignes = op.operation_lignes ?? [];
+                    // Affichage ISIN : identique à l'onglet Opérations (N supports / ISIN unique / legacy)
+                    const isinDisplay = lignes.length > 1
+                      ? `${lignes.length} supports`
+                      : lignes.length === 1
+                        ? (lignes[0].isin ?? "—")
+                        : (op.isin ?? "—");
+                    const defaultLignes = lignes.map((l) => ({ isin: l.isin ?? "", montant: l.montant ?? "" }));
+                    return (
+                    <OperationClickableRow
+                      key={op.id}
+                      operation={op}
+                      defaultLignes={defaultLignes.length > 0 ? defaultLignes : undefined}
+                      clients={(clients ?? []) as Client[]}
+                      conseillers={(conseillers ?? []) as Conseiller[]}
+                      typeOps={refOps ?? []}
+                      produits={refProduits ?? []}
+                      statuts={refStatuts ?? []}
+                      compagnies={refCompagnies ?? []}
+                      produitsStructures={produitsStructures ?? []}
+                      canManageRefs={canManageRefs}
+                      className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-blue/5 ${statutBgClass(op.statut)}`}
+                    >
+                      <td className="px-2 py-1.5 whitespace-nowrap">{formatDate(op.date)}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        {op.clients && op.client_id ? (
+                          <Link
+                            href={`/clients/${op.client_id}`}
+                            className="hover:underline hover:text-pea-teal transition-colors"
+                          >
+                            {`${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()}
+                          </Link>
+                        ) : op.clients ? (
+                          `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()
+                        ) : "—"}
+                      </td>
+                      <td className="px-2 py-1.5 whitespace-nowrap" data-col="type">{op.type_operation ?? "—"}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap" data-col="compagnie">
+                        <div>{op.compagnie ?? "—"}</div>
+                        {op.contrat && <div className="text-xs text-muted-foreground">{op.contrat}</div>}
+                      </td>
+                      <td className="px-2 py-1.5 text-right whitespace-nowrap font-medium" data-col="montant">{formatCurrency(op.montant)}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap text-xs text-muted-foreground" data-col="isin">{isinDisplay}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap" data-col="statut">
+                        {op.statut ? <Badge variant="outline">{op.statut}</Badge> : "—"}
+                      </td>
+                      <td className="px-2 py-1.5 whitespace-nowrap" data-col="conseiller">{op.conseiller_code ?? "—"}</td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <ControleCell
+                          opId={op.id}
+                          champ="courrier_pea"
+                          valeurActuelle={op.courrier_pea}
+                          statutsControle={statuts}
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <ControleCell
+                          opId={op.id}
+                          champ="lettre_mission"
+                          valeurActuelle={op.lettre_mission}
+                          statutsControle={statuts}
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        <ControleCell
+                          opId={op.id}
+                          champ="conformite"
+                          valeurActuelle={op.conformite}
+                          statutsControle={statuts}
+                        />
+                      </td>
+                    </OperationClickableRow>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </DataTableShell>
+            <TablePagination
+              page={pageNum}
+              totalPages={totalPages}
+              total={filtered.length}
+              from={start + 1}
+              to={Math.min(start + PAGE_SIZE, filtered.length)}
+              buildHref={buildHref}
+            />
           </div>
         )}
       </div>

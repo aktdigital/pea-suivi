@@ -28,6 +28,8 @@ export function OperationsFilters({ conseillers, statuts, typeOps, assistantes, 
       } else {
         params.delete(key);
       }
+      // Tout changement de filtre ramène à la page 1
+      params.delete("page");
       // replace + scroll:false : pas d'entrée d'historique par frappe, pas de remontée en haut de page
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },

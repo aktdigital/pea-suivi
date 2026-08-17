@@ -79,10 +79,10 @@ export function OperationRow({
       onClick={handleRowClick}
       className={`border-b border-pea-gray/20 last:border-0 hover:bg-pea-blue/5 cursor-pointer ${statutBgClass(op.statut)}`}
     >
-      <td className="px-3 py-2 whitespace-nowrap">{formatDate(op.date)}</td>
-      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{op.date_fin ? formatDate(op.date_fin) : "—"}</td>
-      <td className="px-3 py-2 whitespace-nowrap">{op.type_operation ?? "—"}</td>
-      <td className="px-3 py-2 whitespace-nowrap" data-no-row-click>
+      <td className="px-2 py-1.5 whitespace-nowrap">{formatDate(op.date)}</td>
+      <td className="px-2 py-1.5 whitespace-nowrap text-muted-foreground" data-col="date_fin">{op.date_fin ? formatDate(op.date_fin) : "—"}</td>
+      <td className="px-2 py-1.5 whitespace-nowrap" data-col="operation">{op.type_operation ?? "—"}</td>
+      <td className="px-2 py-1.5 whitespace-nowrap" data-no-row-click>
         {op.clients && op.client_id ? (
           <Link
             href={`/clients/${op.client_id}`}
@@ -94,56 +94,56 @@ export function OperationRow({
           `${op.clients.nom} ${op.clients.prenom ?? ""}`.trim()
         ) : "—"}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap">{op.produit ?? "—"}</td>
-      <td className="px-3 py-2 whitespace-nowrap">
+      <td className="px-2 py-1.5 whitespace-nowrap" data-col="produit">{op.produit ?? "—"}</td>
+      <td className="px-2 py-1.5 whitespace-nowrap" data-col="compagnie">
         <div>{op.compagnie ?? "—"}</div>
         {op.contrat && <div className="text-xs text-muted-foreground">{op.contrat}</div>}
       </td>
-      <td className="px-3 py-2 text-right whitespace-nowrap font-medium">
+      <td className="px-2 py-1.5 text-right whitespace-nowrap font-medium" data-col="montant">
         {formatCurrency(op.montant)}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap">
+      <td className="px-2 py-1.5 whitespace-nowrap" data-col="collecte">
         {op.collecte_type === "new_cash" ? (
           <Badge variant="info">New Cash</Badge>
         ) : op.collecte_type === "encours" ? (
           <Badge variant="secondary">Encours</Badge>
         ) : "—"}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap">{op.conseiller_code ?? "—"}</td>
-      <td className="px-3 py-2 whitespace-nowrap text-muted-foreground text-xs" data-no-row-click>
+      <td className="px-2 py-1.5 whitespace-nowrap" data-col="conseiller">{op.conseiller_code ?? "—"}</td>
+      <td className="px-2 py-1.5 whitespace-nowrap text-muted-foreground text-xs" data-col="par" data-no-row-click>
         {op.created_by_profile?.full_name ?? "—"}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap">
+      <td className="px-2 py-1.5 whitespace-nowrap" data-col="statut">
         {op.statut ? (
           <Badge variant={getStatutVariant(op.statut)}>{op.statut}</Badge>
         ) : "—"}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap">
+      <td className="px-2 py-1.5 whitespace-nowrap" data-col="support">
         {op.support_type ?? "—"}
       </td>
-      <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">
+      <td className="px-2 py-1.5 whitespace-nowrap text-xs text-muted-foreground" data-col="isin">
         {isinDisplay(op)}
       </td>
-      <td className="px-3 py-2 text-center">
+      <td className="px-2 py-1.5 text-center" data-col="valide">
         {op.validation ? (
           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-teal/15 text-pea-teal text-xs">✓</span>
         ) : (
           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-gray/15 text-pea-gray text-xs">—</span>
         )}
       </td>
-      <td className="px-3 py-2 text-center">
+      <td className="px-2 py-1.5 text-center" data-col="devoir">
         {op.devoir_conseil ? (
           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-teal/15 text-pea-teal text-xs">✓</span>
         ) : (
           <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-pea-gray/15 text-pea-gray text-xs">—</span>
         )}
       </td>
-      <td className="px-3 py-2 max-w-[150px]">
+      <td className="px-2 py-1.5 max-w-[130px]" data-col="commentaire">
         <span className="block truncate text-xs text-muted-foreground" title={op.commentaire ?? ""}>
           {op.commentaire ?? "—"}
         </span>
       </td>
-      <td className="px-3 py-2" data-no-row-click>
+      <td className="px-2 py-1.5" data-no-row-click>
         <OperationRowActions
           operation={op}
           defaultLignes={defaultLignes.length > 0 ? defaultLignes : undefined}

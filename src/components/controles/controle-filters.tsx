@@ -27,6 +27,8 @@ export function ControleFiltersClient({ conseillers, compagnies, statutsControle
       const params = new URLSearchParams(searchParams.toString());
       if (value) params.set(key, value);
       else params.delete(key);
+      // Tout changement de filtre ramène à la page 1
+      params.delete("page");
       // replace + scroll:false : pas d'entrée d'historique par frappe, pas de remontée en haut de page
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
